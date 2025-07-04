@@ -1,0 +1,15 @@
+[
+  {
+    "name": "ts1-bcg-integration",
+    "targetHost": "ts1-bcg-integration-db-0.c6zxpaveewmv.eu-west-1.rds.amazonaws.com",
+    "targetPort": 3306,
+    "localPort": 13306,
+    "bastion": "ts1-bastion"
+  },
+  {
+    "name": "ts1-redis",
+    "targetHost": "redis.local",
+    "bastion": "ts1-bastion",
+    "targetPort": 6379
+  }
+]
