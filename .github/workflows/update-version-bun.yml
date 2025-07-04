@@ -44,13 +44,13 @@ jobs:
 
 
       - name: Bun compile (Linux)
-        run: bun build --compile --target=linux-x64 dist/index.js --outfile=dist/moleport-linux
+        run: bun build --compile --target=bun-linux-arm64 dist/index.js --outfile=dist/moleport-linux
 
       - name: Bun compile (macOS)
-        run: bun build --compile --target=macos-x64 dist/index.js --outfile=dist/moleport-macos || echo "macOS cross-compile not supported"
+        run: bun build --compile --target=bun-darwin-arm64 dist/index.js --outfile=dist/moleport-macos || echo "macOS cross-compile not supported"
 
       - name: Bun compile (Windows)
-        run: bun build --compile --target=windows-x64 dist/index.js --outfile=dist/moleport-win.exe || echo "Windows cross-compile not supported"
+        run: bun build --compile --target=bun-windows-x64-modern dist/index.js --outfile=dist/moleport-win.exe || echo "Windows cross-compile not supported"
 
       - name: Upload binaries (artifact)
         uses: actions/upload-artifact@v4
