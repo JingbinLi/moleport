@@ -2,16 +2,12 @@ name: Update Version and Build with Bun
 
 on:
   push:
-    branches:
-      - main
-      - master
+    tags:
+      - 'v*'
   pull_request:
     branches:
       - main
       - master
-
-  release:
-    types: [published]
 
 jobs:
   build-binary:
