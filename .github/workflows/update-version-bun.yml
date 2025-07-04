@@ -10,6 +10,9 @@ on:
       - main
       - master
 
+  release:
+    types: [published]
+
 jobs:
   build-binary:
     runs-on: ${{ matrix.os }}
@@ -57,8 +60,16 @@ jobs:
       - name: Bun compile
         run: bun build dist/index.js --compile --outfile=${{ matrix.outfile }}
 
-      - name: Upload binary
+      - name: Upload binary (artifact)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.outfile }}
+
+      - name: Upload binary to GitHub Release
+        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ matrix.outfile }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
