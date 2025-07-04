@@ -11,8 +11,20 @@ on:
       - master
 
 jobs:
-  update-version-build:
-    runs-on: ubuntu-latest
+  build-binary:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifact_name: moleport-linux
+            outfile: dist/moleport-linux
+          - os: macos-latest
+            artifact_name: moleport-macos
+            outfile: dist/moleport-macos
+          - os: windows-latest
+            artifact_name: moleport-win.exe
+            outfile: dist/moleport-win.exe
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -42,20 +54,11 @@ jobs:
       - name: TypeScript build
         run: npx tsc
 
-      - name: Build for macOS
-        run: bun build dist/index.js --compile --outfile=dist/moleport-macos
+      - name: Bun compile
+        run: bun build dist/index.js --compile --outfile=${{ matrix.outfile }}
 
-      - name: Build for Linux
-        run: bun build dist/index.js --compile --outfile=dist/moleport-linux --target=linux-x64
-
-      - name: Build for Windows
-        run: bun build dist/index.js --compile --outfile=dist/moleport-win.exe --target=windows-x64
-
-      - name: Upload binaries
+      - name: Upload binary
         uses: actions/upload-artifact@v4
         with:
-          name: moleport-binaries
-          path: |
-            dist/moleport-macos
-            dist/moleport-linux
-            dist/moleport-win.exe
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.outfile }}
