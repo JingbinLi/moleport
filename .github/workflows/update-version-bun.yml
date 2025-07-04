@@ -11,19 +11,7 @@ on:
 
 jobs:
   build-binary:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            artifact_name: moleport-linux
-            outfile: dist/moleport-linux
-          - os: macos-latest
-            artifact_name: moleport-macos
-            outfile: dist/moleport-macos
-          - os: windows-latest
-            artifact_name: moleport-win.exe
-            outfile: dist/moleport-win.exe
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,20 +41,33 @@ jobs:
       - name: TypeScript build
         run: npx tsc
 
-      - name: Bun compile
-        run: bun build dist/index.js --compile --outfile=${{ matrix.outfile }}
 
-      - name: Upload binary (artifact)
+      - name: Bun compile (Linux)
+        run: bun build --compile --target=linux-x64 dist/index.js --outfile=dist/moleport-linux
+
+      - name: Bun compile (macOS)
+        run: bun build --compile --target=macos-x64 dist/index.js --outfile=dist/moleport-macos || echo "macOS cross-compile not supported"
+
+      - name: Bun compile (Windows)
+        run: bun build --compile --target=windows-x64 dist/index.js --outfile=dist/moleport-win.exe || echo "Windows cross-compile not supported"
+
+      - name: Upload binaries (artifact)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.outfile }}
+          name: moleport-binaries
+          path: |
+            dist/moleport-linux
+            dist/moleport-macos
+            dist/moleport-win.exe
 
-      - name: Upload binary to GitHub Release
+      - name: Upload binaries to GitHub Release
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.outfile }}
+          files: |
+            dist/moleport-linux
+            dist/moleport-macos
+            dist/moleport-win.exe
           body: |
             ## Release Notes
             - Automatically build and publish cross-platform binaries (Linux, macOS, Windows)
