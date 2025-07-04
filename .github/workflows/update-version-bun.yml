@@ -63,9 +63,20 @@ jobs:
           path: ${{ matrix.outfile }}
 
       - name: Upload binary to GitHub Release
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')
+        if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.outfile }}
+          body: |
+            ## Release Notes
+            - Automatically build and publish cross-platform binaries (Linux, macOS, Windows)
+            - See commit history for detailed changes
+
+            ### Downloads
+            - [Linux](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/moleport-linux)
+            - [macOS](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/moleport-macos)
+            - [Windows](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/moleport-win.exe)
+
+            Please download the binary for your platform.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
