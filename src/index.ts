@@ -3,29 +3,64 @@ import { Command } from "commander";
 
 const program = new Command();
 
+function getVersionSync(): string {
+  const { execSync } = require("child_process");
+  try {
+    const tag = execSync("git describe --tags --abbrev=0", {
+      stdio: ["ignore", "pipe", "ignore"],
+    })
+      .toString()
+      .trim();
+    return tag;
+  } catch {
+    try {
+      const pkg = require("../package.json");
+      return pkg.version || "0.0.0";
+    } catch {
+      return "0.0.0";
+    }
+  }
+}
+
 program
   .name("moleport")
   .description("SSH tunnel manager (MoleHole)")
-  .version("0.1.0");
+  .version(getVersionSync(), "-v, --version", "output the current version");
 
 import { MoleHole } from "./types";
 import { loadState } from "./state";
-import { stdin } from "process";
 
 program
   .command("tu [target]")
-  .description("Create SSH tunnel, map targetHost:targetPort to a local port")
-  .option("-p, --localPort <port>", "Local port")
-  .option("-b, --bastion <bastion>", "Bastion host")
-  .option("-n, --name <name>", "Tunnel name")
-  .option("-j, --json <jsonString>", "Batch JSON config")
-  .option("--no-check", "Skip tunnel connection validation")
+  .description(
+    `Create SSH tunnel, map targetHost:targetPort to a local port\n\nArguments:\n  [target]           Target in host:port format, e.g. 10.0.0.1:3306\n\nOptions:`
+  )
+  .option(
+    "-p, --localPort <port>",
+    "Local port to bind on localhost (default: random available port)"
+  )
+  .option(
+    "-b, --bastion <bastion>",
+    "Bastion host for SSH jump, e.g. user@bastion-host"
+  )
+  .option(
+    "-n, --name <name>",
+    "Custom tunnel name (default: targetHost:targetPort)"
+  )
+  .option(
+    "-j, --json <jsonString>",
+    "Batch create tunnels from JSON array. Use '-' to read from stdin. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
+  )
+  .option(
+    "--no-check",
+    "Skip tunnel connection validation (do not check if local port is available after SSH starts)"
+  )
   .action(async (target, options) => {
     const { createTunnel } = await import("./tunnel");
     const { loadState, saveState } = await import("./state");
     let tunnels: MoleHole[] = loadState();
-  const skipValidate = options.noCheck === true;
-  if (options.json) {
+    const skipValidate = options.noCheck === true;
+    if (options.json) {
       let configs: any[];
       let jsonStr = options.json;
       if (jsonStr === "-") {
@@ -96,7 +131,9 @@ program
 
 program
   .command("ls")
-  .description("List all tunnels")
+  .description(
+    "List all tunnels. Shows name, local port, target, bastion, and process id."
+  )
   .action(() => {
     const tunnels = loadState();
     if (tunnels.length === 0) {
@@ -114,9 +151,11 @@ program
 
 program
   .command("kill")
-  .description("Kill specified/all tunnel process")
-  .option("-n, --name <name>", "Tunnel name")
-  .option("--all", "Kill all")
+  .description(
+    "Kill specified or all tunnel processes. Use --name to kill by tunnel name, or --all to kill all."
+  )
+  .option("-n, --name <name>", "Tunnel name to kill")
+  .option("--all", "Kill all tunnels")
   .action((options) => {
     const { loadState, saveState } = require("./state");
     const { killTunnel } = require("./kill");
@@ -141,4 +180,3 @@ program
   });
 
 program.parse(process.argv);
-
