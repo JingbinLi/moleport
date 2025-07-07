@@ -19,21 +19,58 @@ You can download the latest prebuilt binaries from the [GitHub Releases page](ht
 - **Windows:** `moleport-win.exe`
 
 
-After download, give execute permission (Linux/macOS):
+
+
+### Usage: Local (per-directory) vs Global (system-wide)
+
+#### Local usage (per-directory)
+
+You can run the binary directly from the download location after granting execute permission:
+
 ```sh
-chmod +x moleport-linux   # or moleport-macos
+# macOS example (in Downloads folder)
+chmod +x ~/Downloads/moleport-macos
+xattr -dr com.apple.quarantine ~/Downloads/moleport-macos  # (macOS only)
+~/Downloads/moleport-macos ...
 ```
 
-If you are on macOS, you may also need to remove the quarantine attribute before running:
+On Linux:
 ```sh
-xattr -dr com.apple.quarantine moleport-macos
+chmod +x ~/Downloads/moleport-linux
+~/Downloads/moleport-linux ...
 ```
 
-Then run:
+On Windows:
 ```sh
-./moleport-linux ...      # or ./moleport-macos ...
-moleport-win.exe ...      # on Windows
+moleport-win.exe ...
 ```
+
+#### Global usage (system-wide)
+
+To use the CLI from anywhere, move the binary to a directory in your PATH (e.g., `/usr/local/bin` on macOS/Linux):
+
+```sh
+# macOS example
+sudo mv ~/Downloads/moleport-macos /usr/local/bin/moleport
+```
+
+
+Now you can run:
+```sh
+moleport -v
+```
+If you see the version number, the CLI is installed successfully.
+
+For detailed usage and all available options, use:
+```sh
+moleport --help
+moleport tu --help
+```
+You can replace `tu` with any subcommand to see its specific help.
+
+On Linux, use the correct binary name and skip the quarantine step.
+
+On Windows, add the binary directory to your PATH or run `moleport-win.exe` directly.
 
 ---
 
