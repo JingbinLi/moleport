@@ -4,21 +4,11 @@ import { Command } from "commander";
 const program = new Command();
 
 function getVersionSync(): string {
-  const { execSync } = require("child_process");
   try {
-    const tag = execSync("git describe --tags --abbrev=0", {
-      stdio: ["ignore", "pipe", "ignore"],
-    })
-      .toString()
-      .trim();
-    return tag;
+    const pkg = require("../package.json");
+    return pkg.version || "0.0.0";
   } catch {
-    try {
-      const pkg = require("../package.json");
-      return pkg.version || "0.0.0";
-    } catch {
-      return "0.0.0";
-    }
+    return "0.0.0";
   }
 }
 

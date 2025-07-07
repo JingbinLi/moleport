@@ -64,12 +64,6 @@ jobs:
             ## Release Notes
             - Automatically build and publish cross-platform binaries (Linux, macOS, Windows)
             - See commit history for detailed changes
-
-            ### Downloads
-            - [Linux](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/moleport-linux)
-            - [macOS](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/moleport-macos)
-            - [Windows](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/moleport-win.exe)
-
             Please download the binary for your platform.
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
