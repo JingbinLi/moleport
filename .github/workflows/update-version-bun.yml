@@ -3,7 +3,7 @@ name: Update Version and Build with Bun
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
     branches:
       - main
@@ -16,7 +16,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v1
@@ -32,7 +31,6 @@ jobs:
           git add package.json package-lock.json || true
           git commit -m "ci: bump version [skip ci]" || echo "No changes to commit"
           git push || echo "No changes to push"
-
 
       - name: Bun compile (Linux)
         run: bun build --compile --target=bun-linux-arm64 src/index.ts --outfile=dist/moleport-linux
@@ -64,6 +62,7 @@ jobs:
             ## Release Notes
             - Automatically build and publish cross-platform binaries (Linux, macOS, Windows)
             - See commit history for detailed changes
+
             Please download the binary for your platform.
         env:
           GITHUB_TOKEN: ${{ secrets.GH_PAT }}
