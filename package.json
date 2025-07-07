@@ -1,6 +1,5 @@
 {
   "name": "moleport",
-  "version": "1.0.0",
   "main": "dist/index.js",
   "bin": {
   "moleport": "dist/index.js"
