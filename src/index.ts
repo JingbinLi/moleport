@@ -19,11 +19,13 @@ program
   .option("-b, --bastion <bastion>", "Bastion host")
   .option("-n, --name <name>", "Tunnel name")
   .option("-j, --json <jsonString>", "Batch JSON config")
+  .option("--no-check", "Skip tunnel connection validation")
   .action(async (target, options) => {
     const { createTunnel } = await import("./tunnel");
     const { loadState, saveState } = await import("./state");
     let tunnels: MoleHole[] = loadState();
-    if (options.json) {
+  const skipValidate = options.noCheck === true;
+  if (options.json) {
       let configs: any[];
       let jsonStr = options.json;
       if (jsonStr === "-") {
@@ -51,7 +53,7 @@ program
         if (exists) {
           results.push(exists);
         } else {
-          const mole = await createTunnel(cfg);
+          const mole = await createTunnel({ ...cfg, skipValidate });
           tunnels.push(mole);
           results.push(mole);
         }
@@ -81,6 +83,7 @@ program
         targetPort,
         localPort: options.localPort ? Number(options.localPort) : undefined,
         bastion: options.bastion,
+        skipValidate,
       });
       tunnels.push(mole);
       saveState(tunnels);

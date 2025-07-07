@@ -54,12 +54,14 @@ export async function createTunnel({
   targetPort,
   localPort,
   bastion,
+  skipValidate,
 }: {
   name: string;
   targetHost: string;
   targetPort: number;
   localPort?: number;
   bastion?: string;
+  skipValidate?: boolean;
 }): Promise<MoleHole> {
   const port = localPort || (await getPort());
   const sshArgs = [
@@ -82,6 +84,19 @@ export async function createTunnel({
     let settled = false;
     const timer = setTimeout(async () => {
       if (!settled) {
+        if (skipValidate) {
+          settled = true;
+          proc.unref();
+          resolve({
+            name,
+            targetHost,
+            targetPort,
+            localPort: port,
+            bastion,
+            pid: proc.pid || -1,
+          });
+          return;
+        }
         const ok = await validateTunnelConnection(port, 500, 6);
         if (ok) {
           settled = true;
