@@ -2,30 +2,30 @@
 
 
 
+
 <p align="center">
 	<img src="./moleport-logo.jpeg" alt="moleport logo" width="180" />
 </p>
 
 # moleport
 
-Node.js CLI tool for SSH tunnel (MolePort) management. Supports both CLI and HTTP API.
+moleport is a Node.js CLI tool for SSH tunnel (MolePort) management. It supports both command-line and HTTP API usage, and can be used as a standalone binary or as a development project.
 
-## Download Binary
+---
 
-You can download the latest prebuilt binaries from the [GitHub Releases page](https://github.com/JingbinLi/moleport/releases):
+## 1. Using the Binary
+
+### 1.1 Download
+
+Download the latest prebuilt binaries from the [GitHub Releases page](https://github.com/JingbinLi/moleport/releases):
 
 - **Linux:** `moleport-linux`
 - **macOS:** `moleport-macos`
 - **Windows:** `moleport-win.exe`
 
+### 1.2 Local Usage (Per-directory)
 
-
-
-### Usage: Local (per-directory) vs Global (system-wide)
-
-#### Local usage (per-directory)
-
-You can run the binary directly from the download location after granting execute permission:
+After downloading, grant execute permission (Linux/macOS):
 
 ```sh
 # macOS example (in Downloads folder)
@@ -45,77 +45,74 @@ On Windows:
 moleport-win.exe ...
 ```
 
-#### Global usage (system-wide)
+### 1.3 Global Usage (System-wide)
 
-To use the CLI from anywhere, move the binary to a directory in your PATH (e.g., `/usr/local/bin` on macOS/Linux):
+To use the CLI from anywhere, move the binary to a directory in your `PATH` (e.g., `/usr/local/bin` on macOS/Linux):
 
 ```sh
-# macOS example
+# macOS/Linux example
 sudo mv ~/Downloads/moleport-macos /usr/local/bin/moleport
 ```
 
+On Windows, add the binary directory to your `PATH` or run `moleport-win.exe` directly.
 
-Now you can run:
+### 1.4 Verify Installation
+
 ```sh
 moleport -v
 ```
 If you see the version number, the CLI is installed successfully.
 
-For detailed usage and all available options, use:
+### 1.5 Command Help
+
+For detailed usage and all available options:
 ```sh
 moleport --help
 moleport tu --help
 ```
-You can replace `tu` with any subcommand to see its specific help.
-
-On Linux, use the correct binary name and skip the quarantine step.
-
-On Windows, add the binary directory to your PATH or run `moleport-win.exe` directly.
+Replace `tu` with any subcommand to see its specific help.
 
 ---
 
-## Install & Build (from source)
+## 2. Usage Examples
+
+### 2.1 Create a Tunnel
 ```sh
-npm install
-npx tsc
-npm link
-```
-This will make the `moleport` command available globally for development/testing.
-
-## Usage
-
-### Create a tunnel
-```
 moleport tu {targetHost}:{targetPort} [-p {localPort}] [-b {bastion}] [-n {name}]
 ```
-Map targetHost:targetPort to a local port, optionally via a bastion host.
+Maps `targetHost:targetPort` to a local port, optionally via a bastion host.
 
-### Batch create tunnels
-```
-moleport tu -j '[{"name":"db","targetHost":"host","targetPort":3306}]'
+### 2.2 Batch Create Tunnels
+```sh
+moleport tu -j '[{"name":"db","targetHost":"host","targetPort":3306,"bastion":"example-bastion"}]'
 ```
 
-### List tunnels
-```
+### 2.3 List Tunnels
+```sh
 moleport ls
 ```
 
-### Kill tunnel(s)
-```
+### 2.4 Kill Tunnel(s)
+```sh
 moleport kill -n {name}
 moleport kill --all
 ```
 
-### Start HTTP API server
-```
+### 2.5 Start HTTP API Server
+```sh
 moleport watch [-p {server_port}]
 ```
 Default port: 8080
 
-## API
+---
 
+## 3. API
 
-## MoleHole Type
+The HTTP API allows you to manage tunnels programmatically. (See future documentation for details.)
+
+---
+
+## 4. MoleHole Type Definition
 ```ts
 type MoleHole = {
 	name: string;
@@ -126,3 +123,6 @@ type MoleHole = {
 	pid: number;
 }
 ```
+
+---
+
