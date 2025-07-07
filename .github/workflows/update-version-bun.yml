@@ -22,15 +22,6 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Bump version
-        run: |
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git config --global user.name "github-actions[bot]"
-          bun add .
-          bunx npm version patch --no-git-tag-version
-          git add package.json package-lock.json || true
-          git commit -m "ci: bump version [skip ci]" || echo "No changes to commit"
-          git push || echo "No changes to push"
 
       - name: Bun compile (Linux)
         run: bun build --compile --target=bun-linux-arm64 src/index.ts --outfile=dist/moleport-linux
