@@ -31,18 +31,18 @@ After downloading, grant execute permission (Linux/macOS):
 # macOS example (in Downloads folder)
 chmod +x ~/Downloads/moleport-macos
 xattr -dr com.apple.quarantine ~/Downloads/moleport-macos  # (macOS only)
-~/Downloads/moleport-macos ...
+~/Downloads/moleport-macos
 ```
 
 On Linux:
 ```sh
 chmod +x ~/Downloads/moleport-linux
-~/Downloads/moleport-linux ...
+~/Downloads/moleport-linux
 ```
 
 On Windows:
 ```sh
-moleport-win.exe ...
+moleport-win.exe
 ```
 
 ### 1.3 Global Usage (System-wide)
