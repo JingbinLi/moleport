@@ -1,8 +1,3 @@
-
-
-
-
-
 <p align="center">
 	<img src="./moleport-logo.jpeg" alt="moleport logo" width="180" />
 </p>
@@ -103,6 +98,32 @@ moleport kill --all
 moleport watch [-p {server_port}]
 ```
 Default port: 8080
+
+### 2.6 Batch Create Tunnels with TOML
+
+You can use the `--toml <config-file-path>` option to batch create multiple tunnels from a TOML file. For example:
+
+```toml
+[[tunnels]]
+name = "db1"
+targetHost = "10.0.0.1"
+targetPort = 3306
+localPort = 13306
+bastion = "user@bastion-host"
+
+[[tunnels]]
+name = "db2"
+targetHost = "10.0.0.2"
+targetPort = 5432
+localPort = 15432
+```
+
+Usage:
+```sh
+moleport tu --toml ./tunnels.toml
+```
+
+Supports both array and object style TOML (e.g., `tunnels = [...]`). This makes it easy to manage multiple tunnels at once.
 
 ---
 
