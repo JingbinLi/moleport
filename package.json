@@ -1,9 +1,9 @@
 {
   "name": "moleport",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "main": "dist/index.js",
   "bin": {
-  "moleport": "dist/index.js"
+    "moleport": "dist/index.js"
   },
   "scripts": {
     "build": "tsc && node scripts/shebang.js",
@@ -19,6 +19,7 @@
     "@types/node": "^24.0.10",
     "commander": "^14.0.0",
     "get-port": "^7.1.0",
+    "toml": "^3.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },

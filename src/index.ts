@@ -42,14 +42,58 @@ program
     "Batch create tunnels from JSON array. Use '-' to read from stdin. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
   )
   .option(
+    "-t, --toml <tomlPath>",
+    "Batch create tunnels from a TOML config file. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
+  )
+  .option(
     "--no-check",
     "Skip tunnel connection validation (do not check if local port is available after SSH starts)"
   )
   .action(async (target, options) => {
+    const fs = await import("fs");
+    let toml;
+    if (options.toml) {
+      try {
+        toml = (await import("toml")).parse;
+      } catch {
+        console.error("Please install toml: npm install toml");
+        process.exit(1);
+      }
+    }
     const { createTunnel } = await import("./tunnel");
     const { loadState, saveState } = await import("./state");
+    const { killTunnel } = await import("./kill");
     let tunnels: MoleHole[] = loadState();
+    // Kill all tunnels before creating new ones
+    const killResult = killTunnel(tunnels, undefined, true);
+    tunnels = killResult.remaining;
+    saveState(tunnels);
     const skipValidate = options.noCheck === true;
+    if (options.toml) {
+      let configs;
+      try {
+        const tomlStr = fs.readFileSync(options.toml, "utf8");
+        configs = toml!(tomlStr);
+        if (Array.isArray(configs)) {
+        } else if (configs.tunnels && Array.isArray(configs.tunnels)) {
+          configs = configs.tunnels;
+        } else {
+          throw new Error("TOML must export an array or { tunnels = [] }");
+        }
+      } catch (e: any) {
+        console.error("Invalid TOML:", e.message);
+        process.exit(1);
+      }
+      const results = [];
+      for (const cfg of configs) {
+        const mole = await createTunnel({ ...cfg, skipValidate });
+        tunnels.push(mole);
+        results.push(mole);
+      }
+      saveState(tunnels);
+      console.log(JSON.stringify(results, null, 2));
+      return;
+    }
     if (options.json) {
       let configs: any[];
       let jsonStr = options.json;
@@ -70,18 +114,9 @@ program
       }
       const results: MoleHole[] = [];
       for (const cfg of configs) {
-        const exists = tunnels.find(
-          (t) =>
-            t.name === cfg.name ||
-            (t.targetHost === cfg.targetHost && t.targetPort === cfg.targetPort)
-        );
-        if (exists) {
-          results.push(exists);
-        } else {
-          const mole = await createTunnel({ ...cfg, skipValidate });
-          tunnels.push(mole);
-          results.push(mole);
-        }
+        const mole = await createTunnel({ ...cfg, skipValidate });
+        tunnels.push(mole);
+        results.push(mole);
       }
       saveState(tunnels);
       console.log(JSON.stringify(results, null, 2));
