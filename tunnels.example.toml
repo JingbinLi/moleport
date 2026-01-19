@@ -1,0 +1,19 @@
+# This is a example configuration file for moleport tunnels
+[[tunnels]]
+name = "ts1-maindb"
+targetHost = "target-database.example.com"
+targetPort = 3306
+# localPort = 3306 # Optional, defaults to targetPort if not specified
+bastion = "ts1-bastion"
+
+[[tunnels]]
+name = "ts1-api-gateway"
+targetHost = "api-gateway.example.com"
+targetPort = 443
+bastion = "ts1-bastion"
+
+[[tunnels]]
+name = "d15a-api-gateway"
+targetHost = "api-gateway.example.com"
+targetPort = 443
+bastion = "d15a-bastion"
