@@ -20,36 +20,8 @@ program
 import { MoleHole } from "./types";
 import { loadState } from "./state";
 
-program
-  .command("tu [target]")
-  .description(
-    `Create SSH tunnel, map targetHost:targetPort to a local port\n\nArguments:\n  [target]           Target in host:port format, e.g. 10.0.0.1:3306\n\nOptions:`
-  )
-  .option(
-    "-p, --localPort <port>",
-    "Local port to bind on localhost (default: random available port)"
-  )
-  .option(
-    "-b, --bastion <bastion>",
-    "Bastion host for SSH jump, e.g. user@bastion-host"
-  )
-  .option(
-    "-n, --name <name>",
-    "Custom tunnel name (default: targetHost:targetPort)"
-  )
-  .option(
-    "-j, --json <jsonString>",
-    "Batch create tunnels from JSON array. Use '-' to read from stdin. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
-  )
-  .option(
-    "-t, --toml <tomlPath>",
-    "Batch create tunnels from a TOML config file. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
-  )
-  .option(
-    "--no-check",
-    "Skip tunnel connection validation (do not check if local port is available after SSH starts)"
-  )
-  .action(async (target, options) => {
+// Shared tunnel creation logic
+async function handleTunnelCreation(target: string | undefined, options: any) {
     const fs = await import("fs");
     let toml;
     if (options.toml) {
@@ -148,11 +120,71 @@ program
       tunnels.push(mole);
       saveState(tunnels);
       console.log(JSON.stringify(mole, null, 2));
-    } else {
-      console.error("Please specify target or --json");
-      process.exit(1);
+    } else if (!options.toml && !options.json) {
+      // If no target, json, or toml provided, show help
+      program.help();
     }
-  });
+}
+
+program
+  .command("tu [target]")
+  .description(
+    `Create SSH tunnel, map targetHost:targetPort to a local port\n\nArguments:\n  [target]           Target in host:port format, e.g. 10.0.0.1:3306\n\nOptions:`
+  )
+  .option(
+    "-p, --localPort <port>",
+    "Local port to bind on localhost (default: random available port)"
+  )
+  .option(
+    "-b, --bastion <bastion>",
+    "Bastion host for SSH jump, e.g. user@bastion-host"
+  )
+  .option(
+    "-n, --name <name>",
+    "Custom tunnel name (default: targetHost:targetPort)"
+  )
+  .option(
+    "-j, --json <jsonString>",
+    "Batch create tunnels from JSON array. Use '-' to read from stdin. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
+  )
+  .option(
+    "-t, --toml <tomlPath>",
+    "Batch create tunnels from a TOML config file. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
+  )
+  .option(
+    "--no-check",
+    "Skip tunnel connection validation (do not check if local port is available after SSH starts)"
+  )
+  .action(handleTunnelCreation);
+
+// Also support direct usage without 'tu' subcommand
+program
+  .argument("[target]", "Target in host:port format, e.g. 10.0.0.1:3306")
+  .option(
+    "-p, --localPort <port>",
+    "Local port to bind on localhost (default: random available port)"
+  )
+  .option(
+    "-b, --bastion <bastion>",
+    "Bastion host for SSH jump, e.g. user@bastion-host"
+  )
+  .option(
+    "-n, --name <name>",
+    "Custom tunnel name (default: targetHost:targetPort)"
+  )
+  .option(
+    "-j, --json <jsonString>",
+    "Batch create tunnels from JSON array. Use '-' to read from stdin. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
+  )
+  .option(
+    "-t, --toml <tomlPath>",
+    "Batch create tunnels from a TOML config file. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
+  )
+  .option(
+    "--no-check",
+    "Skip tunnel connection validation (do not check if local port is available after SSH starts)"
+  )
+  .action(handleTunnelCreation);
 
 program
   .command("ls")
