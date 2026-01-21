@@ -69,7 +69,7 @@ export async function createTunnel({
     "-o",
     "ExitOnForwardFailure=yes",
     "-L",
-    `${port}:${targetHost}:${targetPort}`,
+    `0.0.0.0:${port}:${targetHost}:${targetPort}`,
   ];
   if (bastion) {
     sshArgs.push(bastion);
