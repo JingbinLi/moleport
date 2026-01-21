@@ -40,13 +40,48 @@ On Windows:
 moleport-win.exe
 ```
 
-### 1.3 Global Usage (System-wide)
+### 1.3 Global Usage (Recommended)
 
-To use the CLI from anywhere, move the binary to a directory in your `PATH` (e.g., `/usr/local/bin` on macOS/Linux):
+#### User Installation (No sudo required)
+
+Install to your user directory:
 
 ```sh
-# macOS/Linux example
-sudo mv ~/Downloads/moleport-macos /usr/local/bin/moleport
+# macOS/Linux
+mkdir -p ~/.local/moleport
+mv ~/Downloads/moleport-macos ~/.local/moleport/moleport
+chmod +x ~/.local/moleport/moleport
+
+# macOS only: remove quarantine
+xattr -dr com.apple.quarantine ~/.local/moleport/moleport
+
+# Create symlink in user's bin directory
+mkdir -p ~/.local/bin
+ln -sf ~/.local/moleport/moleport ~/.local/bin/moleport
+
+# Add to PATH (if not already in your shell profile)
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc  # or ~/.bashrc
+source ~/.zshrc  # or source ~/.bashrc
+```
+
+Benefits: No sudo needed, easy self-updates with `moleport update`.
+
+#### System-wide Installation (Optional)
+
+For all users on the system:
+
+```sh
+# macOS/Linux (requires sudo)
+sudo mkdir -p /usr/local/moleport
+sudo mv ~/Downloads/moleport-macos /usr/local/moleport/moleport
+sudo chmod +x /usr/local/moleport/moleport
+sudo ln -sf /usr/local/moleport/moleport /usr/local/bin/moleport
+
+# macOS only: remove quarantine
+sudo xattr -dr com.apple.quarantine /usr/local/moleport/moleport
+
+# Optional: allow updates without sudo
+sudo chown -R $(whoami) /usr/local/moleport
 ```
 
 On Windows, add the binary directory to your `PATH` or run `moleport-win.exe` directly.

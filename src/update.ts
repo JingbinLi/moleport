@@ -1,6 +1,6 @@
-import { createWriteStream, existsSync, unlinkSync, chmodSync, renameSync } from "fs";
+import { createWriteStream, existsSync, unlinkSync, chmodSync, renameSync, readlinkSync, lstatSync } from "fs";
 import { get } from "https";
-import { join } from "path";
+import { join, dirname } from "path";
 import { execSync } from "child_process";
 
 const GITHUB_REPO = "JingbinLi/moleport";
@@ -94,11 +94,27 @@ function downloadFile(url: string, dest: string): Promise<void> {
 function getCurrentBinaryPath(): string | null {
   try {
     // Get the path of the currently running executable
-    const execPath = process.execPath;
+    let execPath = process.execPath;
     
     // Check if we're running as a packaged binary (not node)
     if (execPath.includes("node")) {
       return null; // Running in development mode
+    }
+    
+    // If it's a symlink, resolve to the actual file
+    try {
+      const stats = lstatSync(execPath);
+      if (stats.isSymbolicLink()) {
+        const realPath = readlinkSync(execPath);
+        // Handle relative symlinks
+        if (realPath.startsWith('/')) {
+          execPath = realPath;
+        } else {
+          execPath = join(dirname(execPath), realPath);
+        }
+      }
+    } catch {
+      // If we can't check symlink, just use the original path
     }
     
     return execPath;
