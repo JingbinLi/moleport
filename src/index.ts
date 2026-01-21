@@ -12,6 +12,19 @@ function getVersionSync(): string {
   }
 }
 
+// Check for updates silently at startup
+async function checkForUpdatesAtStartup(): Promise<void> {
+  try {
+    const { checkForUpdates } = await import("./update");
+    await checkForUpdates(true); // Silent check
+  } catch {
+    // Silently fail if update check fails
+  }
+}
+
+// Run update check at startup (non-blocking)
+checkForUpdatesAtStartup();
+
 program
   .name("moleport")
   .description("SSH tunnel manager (MoleHole)")
@@ -233,6 +246,24 @@ program
       killed.forEach((t: MoleHole) => {
         console.log(`Killed [${t.name}] (pid: ${t.pid})`);
       });
+    }
+  });
+
+program
+  .command("update")
+  .description("Check for updates and install the latest version")
+  .option("--check-only", "Only check for updates without installing")
+  .action(async (options) => {
+    const { checkForUpdates, updateBinary } = await import("./update");
+    try {
+      if (options.checkOnly) {
+        await checkForUpdates(false);
+      } else {
+        await updateBinary();
+      }
+    } catch (error: any) {
+      console.error(`❌ Update failed: ${error.message}`);
+      process.exit(1);
     }
   });
 
