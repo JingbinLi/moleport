@@ -148,6 +148,17 @@ export async function updateBinary(): Promise<void> {
     return;
   }
   
+  // Check write permission
+  try {
+    const testFile = currentBinaryPath + ".test";
+    createWriteStream(testFile).close();
+    unlinkSync(testFile);
+  } catch (error) {
+    console.error("❌ Cannot update: no write permission to binary directory");
+    console.log(`💡 Try running with sudo: sudo moleport update`);
+    throw error;
+  }
+  
   const currentVersion = getCurrentVersion();
   const release = await getLatestRelease();
   const latestVersion = release.tag_name.replace(/^v/, "");
@@ -171,38 +182,67 @@ export async function updateBinary(): Promise<void> {
   const backupPath = currentBinaryPath + ".backup";
   
   console.log(`⬇️  Downloading ${binaryName}...`);
-  await downloadFile(downloadUrl, tempPath);
   
-  console.log("📝 Installing update...");
-  
-  // Backup current binary
-  if (existsSync(backupPath)) {
-    unlinkSync(backupPath);
-  }
-  renameSync(currentBinaryPath, backupPath);
-  
-  // Replace with new binary
-  renameSync(tempPath, currentBinaryPath);
-  
-  // Set executable permissions (Unix-like systems)
-  if (process.platform !== "win32") {
-    chmodSync(currentBinaryPath, 0o755);
+  try {
+    await downloadFile(downloadUrl, tempPath);
     
-    // Remove macOS quarantine attribute
-    if (process.platform === "darwin") {
-      try {
-        execSync(`xattr -dr com.apple.quarantine "${currentBinaryPath}"`, {
-          stdio: "ignore",
-        });
-      } catch {
-        // Ignore if xattr fails
+    // Verify download succeeded
+    if (!existsSync(tempPath)) {
+      throw new Error("Download failed: file not created");
+    }
+    
+    console.log("📝 Installing update...");
+    
+    // Backup current binary
+    if (existsSync(backupPath)) {
+      unlinkSync(backupPath);
+    }
+    renameSync(currentBinaryPath, backupPath);
+    
+    // Replace with new binary
+    renameSync(tempPath, currentBinaryPath);
+    
+    // Set executable permissions (Unix-like systems)
+    if (process.platform !== "win32") {
+      chmodSync(currentBinaryPath, 0o755);
+      
+      // Remove macOS quarantine attribute
+      if (process.platform === "darwin") {
+        try {
+          execSync(`xattr -dr com.apple.quarantine "${currentBinaryPath}"`, {
+            stdio: "ignore",
+          });
+        } catch {
+          // Ignore if xattr fails
+        }
       }
     }
+    
+    // Clean up backup
+    unlinkSync(backupPath);
+    
+    console.log(`✅ Successfully updated to version ${latestVersion}`);
+    console.log("🎉 Please restart moleport to use the new version");
+  } catch (error) {
+    // Clean up temp file if it exists
+    if (existsSync(tempPath)) {
+      try {
+        unlinkSync(tempPath);
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+    
+    // Restore backup if it exists
+    if (existsSync(backupPath) && !existsSync(currentBinaryPath)) {
+      try {
+        renameSync(backupPath, currentBinaryPath);
+        console.log("⚠️  Restored previous version after update failure");
+      } catch {
+        // Ignore restore errors
+      }
+    }
+    
+    throw error;
   }
-  
-  // Clean up backup
-  unlinkSync(backupPath);
-  
-  console.log(`✅ Successfully updated to version ${latestVersion}`);
-  console.log("🎉 Please restart moleport to use the new version");
 }
