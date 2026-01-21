@@ -93,13 +93,30 @@ moleport kill -n {name}
 moleport kill --all
 ```
 
-### 2.5 Start HTTP API Server
+### 2.5 Update moleport
+```sh
+# Check and install the latest version
+moleport update
+
+# Only check for updates (without installing)
+moleport update --check-only
+```
+
+The update command automatically:
+- Downloads the latest binary from GitHub releases
+- Replaces the current binary with the new version
+- Sets executable permissions
+- Removes macOS quarantine attribute (if applicable)
+
+moleport also checks for updates silently at startup and notifies you when a new version is available.
+
+### 2.6 Start HTTP API Server
 ```sh
 moleport watch [-p {server_port}]
 ```
 Default port: 8080
 
-### 2.6 Batch Create Tunnels with TOML
+### 2.7 Batch Create Tunnels with TOML
 
 You can use the `--toml <config-file-path>` option to batch create multiple tunnels from a TOML file. For example:
 
