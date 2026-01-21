@@ -165,14 +165,25 @@ export async function updateBinary(): Promise<void> {
   }
   
   // Check write permission
+  const { accessSync, constants, writeFileSync } = require("fs");
+  const binaryDir = dirname(currentBinaryPath);
+  
   try {
-    const testFile = currentBinaryPath + ".test";
-    createWriteStream(testFile).close();
+    // Check directory write permission
+    accessSync(binaryDir, constants.W_OK);
+    
+    // Try to create a test file
+    const testFile = join(binaryDir, ".moleport-update-test");
+    writeFileSync(testFile, "test");
     unlinkSync(testFile);
-  } catch (error) {
-    console.error("❌ Cannot update: no write permission to binary directory");
-    console.log(`💡 Try running with sudo: sudo moleport update`);
-    throw error;
+  } catch (error: any) {
+    if (error.code === "EACCES" || error.code === "EPERM") {
+      console.error("❌ Cannot update: no write permission to binary directory");
+      console.log(`💡 Try running with sudo: sudo moleport update`);
+      console.log(`   Or reinstall to user directory: ~/.local/moleport/`);
+      throw error;
+    }
+    // For other errors, continue (might be transient)
   }
   
   const currentVersion = getCurrentVersion();
