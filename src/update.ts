@@ -25,6 +25,27 @@ function getCurrentVersion(): string {
   }
 }
 
+/**
+ * Compare two dotted version strings ("1.2.10" > "1.2.9").
+ * Guards against downgrades: a locally built (unreleased) binary must never be
+ * replaced by an older GitHub release just because the versions differ.
+ */
+function isNewerVersion(latest: string, current: string): boolean {
+  const parse = (v: string) =>
+    v
+      .replace(/^v/, "")
+      .split(".")
+      .map((part) => parseInt(part, 10) || 0);
+  const a = parse(latest);
+  const b = parse(current);
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] || 0;
+    const y = b[i] || 0;
+    if (x !== y) return x > y;
+  }
+  return false;
+}
+
 function getPlatformBinaryName(): string {
   const platform = process.platform;
   if (platform === "darwin") return "moleport-macos";
@@ -134,7 +155,7 @@ export async function checkForUpdates(silent = false): Promise<{
     const release = await getLatestRelease();
     const latestVersion = release.tag_name.replace(/^v/, "");
     
-    const hasUpdate = latestVersion !== currentVersion;
+    const hasUpdate = isNewerVersion(latestVersion, currentVersion);
     
     if (!silent) {
       if (hasUpdate) {
@@ -190,7 +211,7 @@ export async function updateBinary(): Promise<void> {
   const release = await getLatestRelease();
   const latestVersion = release.tag_name.replace(/^v/, "");
   
-  if (latestVersion === currentVersion) {
+  if (!isNewerVersion(latestVersion, currentVersion)) {
     console.log(`✅ Already on the latest version (${currentVersion})`);
     return;
   }

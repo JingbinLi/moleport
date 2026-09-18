@@ -168,14 +168,21 @@ name = "db2"
 targetHost = "10.0.0.2"
 targetPort = 5432
 localPort = 15432
+# optional: per-tunnel override of the local port wait budget (ms)
+timeoutMs = 15000
 ```
 
 Usage:
 ```sh
 moleport tu --toml ./tunnels.toml
+
+# slow bastions (e.g. a ProxyCommand double hop): give every tunnel more time
+moleport tu --toml ./tunnels.toml --timeout 20000
 ```
 
 Supports both array and object style TOML (e.g., `tunnels = [...]`). This makes it easy to manage multiple tunnels at once.
+
+Batch creation is resilient: when one tunnel cannot be created (its local port is already held by a leftover tunnel or another process, or the bastion is too slow), the remaining tunnels are still created, the state file keeps every tunnel that succeeded, the failures are listed on stderr, and the process exits with status `1`. Slow hops are also detected up front: an occupied local port fails fast with a clear message instead of a validation timeout.
 
 ---
 

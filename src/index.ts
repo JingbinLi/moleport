@@ -2,6 +2,10 @@
 import { Command } from "commander";
 
 const program = new Command();
+// Required so that `moleport tu <target> -p/-b/-n ...` reaches the `tu` subcommand:
+// without this the root command (which also declares [target] and the same options)
+// swallows every flag that follows the subcommand name.
+program.enablePositionalOptions();
 
 function getVersionSync(): string {
   try {
@@ -33,6 +37,9 @@ program
 import { MoleHole } from "./types";
 import { loadState } from "./state";
 
+const TIMEOUT_OPTION_DESCRIPTION =
+  "How long to wait for each tunnel's local port to become available, in ms (default: 10000)";
+
 // Shared tunnel creation logic
 async function handleTunnelCreation(target: string | undefined, options: any) {
     const fs = await import("fs");
@@ -45,7 +52,7 @@ async function handleTunnelCreation(target: string | undefined, options: any) {
         process.exit(1);
       }
     }
-    const { createTunnel } = await import("./tunnel");
+    const { createTunnel, DEFAULT_TUNNEL_TIMEOUT_MS } = await import("./tunnel");
     const { loadState, saveState } = await import("./state");
     const { killTunnel } = await import("./kill");
     let tunnels: MoleHole[] = loadState();
@@ -53,7 +60,48 @@ async function handleTunnelCreation(target: string | undefined, options: any) {
     const killResult = killTunnel(tunnels, undefined, true);
     tunnels = killResult.remaining;
     saveState(tunnels);
-    const skipValidate = options.noCheck === true;
+    // commander turns `--no-check` into `options.check === false`; `noCheck` is
+    // kept for backwards compatibility with older call sites.
+    const skipValidate = options.check === false || options.noCheck === true;
+    const defaultTimeoutMs = options.timeout
+      ? Number(options.timeout)
+      : DEFAULT_TUNNEL_TIMEOUT_MS;
+
+    // Create tunnels one by one. A single failure must neither abort the batch
+    // nor lose track of the tunnels that were created successfully (which would
+    // leave untracked ssh processes holding their local ports).
+    const createBatch = async (configs: any[]): Promise<MoleHole[]> => {
+      const results: MoleHole[] = [];
+      const failures: { name: string; error: string }[] = [];
+      for (const cfg of configs) {
+        const label = cfg.name || `${cfg.targetHost}:${cfg.targetPort}`;
+        try {
+          // Per-entry `timeoutMs` (TOML/JSON) wins over the CLI default.
+          const mole = await createTunnel({
+            timeoutMs: defaultTimeoutMs,
+            ...cfg,
+            skipValidate,
+          });
+          tunnels.push(mole);
+          results.push(mole);
+        } catch (e: any) {
+          const message = e?.message || String(e);
+          failures.push({ name: label, error: message });
+          console.error(`⚠️  [${label}] ${message}`);
+        }
+      }
+      saveState(tunnels);
+      console.log(JSON.stringify(results, null, 2));
+      if (failures.length > 0) {
+        console.error(
+          `❌ ${failures.length}/${configs.length} tunnel(s) failed: ` +
+            `${failures.map((f) => f.name).join(", ")} (active tunnels: moleport ls)`
+        );
+        process.exitCode = 1;
+      }
+      return results;
+    };
+
     if (options.toml) {
       let configs;
       try {
@@ -69,14 +117,7 @@ async function handleTunnelCreation(target: string | undefined, options: any) {
         console.error("Invalid TOML:", e.message);
         process.exit(1);
       }
-      const results = [];
-      for (const cfg of configs) {
-        const mole = await createTunnel({ ...cfg, skipValidate });
-        tunnels.push(mole);
-        results.push(mole);
-      }
-      saveState(tunnels);
-      console.log(JSON.stringify(results, null, 2));
+      await createBatch(configs);
       return;
     }
     if (options.json) {
@@ -97,15 +138,10 @@ async function handleTunnelCreation(target: string | undefined, options: any) {
         console.error("Invalid JSON");
         process.exit(1);
       }
-      const results: MoleHole[] = [];
-      for (const cfg of configs) {
-        const mole = await createTunnel({ ...cfg, skipValidate });
-        tunnels.push(mole);
-        results.push(mole);
-      }
-      saveState(tunnels);
-      console.log(JSON.stringify(results, null, 2));
-    } else if (target) {
+      await createBatch(configs);
+      return;
+    }
+    if (target) {
       const [targetHost, targetPortStr] = target.split(":");
       const targetPort = Number(targetPortStr);
       if (!targetHost || !targetPort) {
@@ -122,21 +158,27 @@ async function handleTunnelCreation(target: string | undefined, options: any) {
         console.log(JSON.stringify(exists, null, 2));
         return;
       }
-      const mole = await createTunnel({
-        name,
-        targetHost,
-        targetPort,
-        localPort: options.localPort ? Number(options.localPort) : undefined,
-        bastion: options.bastion,
-        skipValidate,
-      });
-      tunnels.push(mole);
-      saveState(tunnels);
-      console.log(JSON.stringify(mole, null, 2));
-    } else if (!options.toml && !options.json) {
-      // If no target, json, or toml provided, show help
-      program.help();
+      try {
+        const mole = await createTunnel({
+          name,
+          targetHost,
+          targetPort,
+          localPort: options.localPort ? Number(options.localPort) : undefined,
+          bastion: options.bastion,
+          skipValidate,
+          timeoutMs: defaultTimeoutMs,
+        });
+        tunnels.push(mole);
+        saveState(tunnels);
+        console.log(JSON.stringify(mole, null, 2));
+      } catch (e: any) {
+        console.error(`❌ [${name}] ${e?.message || e}`);
+        process.exitCode = 1;
+      }
+      return;
     }
+    // If no target, json, or toml provided, show help
+    program.help();
 }
 
 program
@@ -164,6 +206,7 @@ program
     "-t, --toml <tomlPath>",
     "Batch create tunnels from a TOML config file. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
   )
+  .option("--timeout <ms>", TIMEOUT_OPTION_DESCRIPTION)
   .option(
     "--no-check",
     "Skip tunnel connection validation (do not check if local port is available after SSH starts)"
@@ -193,6 +236,7 @@ program
     "-t, --toml <tomlPath>",
     "Batch create tunnels from a TOML config file. Each item: {name, targetHost, targetPort, [localPort], [bastion]}"
   )
+  .option("--timeout <ms>", TIMEOUT_OPTION_DESCRIPTION)
   .option(
     "--no-check",
     "Skip tunnel connection validation (do not check if local port is available after SSH starts)"
