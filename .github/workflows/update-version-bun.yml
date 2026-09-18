@@ -10,6 +10,12 @@ on:
       - master
   workflow_dispatch:
 
+# Publish the release with the built-in GITHUB_TOKEN instead of a PAT secret:
+# a missing or expired GH_PAT silently fell back to the default read-only token
+# and failed the release step with "Resource not accessible by integration".
+permissions:
+  contents: write
+
 jobs:
   build-binary:
     runs-on: ubuntu-latest
@@ -57,5 +63,3 @@ jobs:
             - See commit history for detailed changes
 
             Please download the binary for your platform.
-        env:
-          GITHUB_TOKEN: ${{ secrets.GH_PAT }}
