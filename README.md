@@ -8,6 +8,99 @@ moleport is a Node.js CLI tool for SSH tunnel (MolePort) management. It supports
 
 ---
 
+## 0. Let an AI agent install it for you
+
+Copy everything inside the box below and paste it into your AI assistant (Claude, ChatGPT, Copilot, Cursor, ...). It contains what the agent needs to install moleport, verify it, and configure your tunnels — including the architecture gap that would otherwise make it download a binary that cannot run.
+
+```text
+You are helping me install and configure moleport, a CLI that manages SSH local-port-forwarding tunnels.
+Repository: https://github.com/JingbinLi/moleport
+
+STEP 1 - is it already installed?
+  Run: moleport -v
+  If it prints a version (1.3.1 or newer), skip to STEP 4.
+
+STEP 2 - install it (no sudo needed)
+  Prebuilt binaries:
+    https://github.com/JingbinLi/moleport/releases/latest/download/<asset>
+  Pick the asset that matches this machine:
+    moleport-macos    macOS on Apple Silicon (arm64) ONLY - not Intel Macs
+    moleport-linux    Linux on ARM64 (aarch64) ONLY - not x86-64 servers
+    moleport-win.exe  Windows on x86-64
+  Download with curl -fL -o, not with a browser.
+
+  macOS / Linux:
+    mkdir -p ~/.local/moleport ~/.local/bin
+    curl -fL -o ~/.local/moleport/moleport https://github.com/JingbinLi/moleport/releases/latest/download/<asset>
+    chmod +x ~/.local/moleport/moleport
+    ln -sf ~/.local/moleport/moleport ~/.local/bin/moleport
+    xattr -dr com.apple.quarantine ~/.local/moleport/moleport   # macOS only; ignore "no such xattr"
+    Make sure ~/.local/bin is on PATH (add the export line to ~/.zshrc or ~/.bashrc).
+
+  Windows: put moleport-win.exe in a directory that is on PATH.
+
+  There is NO prebuilt binary for x86-64 Linux or for Intel Macs. If this machine
+  is one of those, tell me and build from source instead:
+    git clone https://github.com/JingbinLi/moleport.git && cd moleport
+    bun install
+    bun build --compile --target=bun-darwin-x64 src/index.ts --outfile=dist/moleport
+      (other targets: bun-linux-x64, bun-linux-arm64, bun-darwin-arm64,
+       bun-windows-x64-modern)
+  Without bun: npm install && npm run build, then run it as node dist/index.js.
+
+STEP 3 - verify
+  moleport -v must report the version. On macOS, "Killed: 9" or "cannot be
+  opened" means the quarantine flag or an invalid ad-hoc signature: re-run the
+  xattr command. Never overwrite a binary that is currently running in place -
+  write the new file and rename it over the old path.
+
+STEP 4 - understand it before changing anything
+  - Each tunnel is a detached "ssh -N -o ExitOnForwardFailure=yes -L ..." process.
+    Bastions are ordinary Host entries in ~/.ssh/config. No AWS credentials or
+    aws sso session is involved, so an expired login does not drop tunnels.
+  - Running tunnels are recorded in ~/.mole_holes.json, per-tunnel ssh output
+    goes to ~/.moleport-logs/<name>.log, and the web UI lock is
+    ~/.moleport-web.json.
+  - The tunnel list is a TOML file. Ask me for its path and read it before editing.
+
+STEP 5 - the TOML format
+  [[tunnels]]
+  name       = "ts1-maindb"
+  targetHost = "db.internal"
+  targetPort = 3306
+  localPort  = 3306            # optional; a free port is picked when omitted
+  bastion    = "ts1-bastion"   # a Host from ~/.ssh/config; omit for a direct hop
+  timeoutMs  = 10000           # optional per-tunnel wait budget
+
+STEP 6 - the commands
+  moleport --toml ~/path/tunnels.toml   recreate every tunnel AND start the web UI
+  moleport ls                           list tunnels
+  moleport kill --all                   stop every tunnel
+  moleport web --toml <file> --detach   web UI only, leaves running tunnels alone
+  moleport web --status                 where is the web UI?
+  moleport web --stop                   stop the web UI
+  moleport update                       self-update to the latest release
+
+  The web UI binds http://127.0.0.1:7788 only. It lists every tunnel with its
+  live state (running / disconnected / stopped), starts and stops single
+  tunnels, shows that tunnel's ssh log, and edits the TOML file - saving keeps
+  the previous version as <file>.bak.
+
+RULES
+  - Do not stop or recreate my tunnels unless I ask. "--toml" kills and rebuilds
+    all of them.
+  - Before creating tunnels, confirm the bastion Host(s) exist in ~/.ssh/config
+    and that the local ports are free.
+  - If a tunnel fails or drops, read ~/.moleport-logs/<name>.log and show me the
+    relevant lines instead of guessing.
+  - Never rewrite my TOML file without showing me the change first.
+
+Reply to me in the language I used. Start with STEP 1, and once moleport is
+installed ask me for the path of my tunnels TOML file.
+```
+
+---
+
 ## 1. Using the Binary
 
 ### 1.1 Download
