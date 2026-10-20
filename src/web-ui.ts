@@ -82,12 +82,12 @@ export function renderWebUi(): string {
   .link.stop:hover:not(:disabled) { background: var(--red-weak); }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }
-  th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+  th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: #fafbfc; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
   .cell-target { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 550; }
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 550; white-space: nowrap; }
   .pill.on { background: var(--green-weak); color: var(--green); }
   .pill.off { background: #f1f3f6; color: var(--muted); }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
