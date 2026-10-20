@@ -80,13 +80,18 @@ export function renderWebUi(): string {
   .link.start:hover:not(:disabled) { background: var(--green-weak); }
   .link.stop { color: var(--red); }
   .link.stop:hover:not(:disabled) { background: var(--red-weak); }
-  table { width: 100%; border-collapse: collapse; }
-  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }
+  table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+  th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; overflow: hidden; text-overflow: ellipsis; }
+  th:nth-child(1), td:nth-child(1) { width: 150px; }
+  th:nth-child(2), td:nth-child(2) { width: 170px; }
+  th:nth-child(4), td:nth-child(4) { width: 88px; }
+  th:nth-child(5), td:nth-child(5) { width: 150px; }
+  th:nth-child(6), td:nth-child(6) { width: 200px; overflow: visible; text-align: right; white-space: nowrap; }
   th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; white-space: nowrap; }
   tbody tr:last-child td { border-bottom: none; }
   tbody tr:hover { background: #fafbfc; }
   .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
-  .cell-target { max-width: 340px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cell-target { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 550; white-space: nowrap; }
   .pill.on { background: var(--green-weak); color: var(--green); }
   .pill.off { background: #f1f3f6; color: var(--muted); }
@@ -100,6 +105,19 @@ export function renderWebUi(): string {
   .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--amber-weak); color: var(--amber); }
   .hidden { display: none !important; }
   .form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px 14px; }
+  @media (max-width: 900px) {
+    th:nth-child(5), td:nth-child(5) { display: none; }
+    th:nth-child(1), td:nth-child(1) { width: 140px; }
+    th:nth-child(2), td:nth-child(2) { width: 130px; }
+  }
+  @media (max-width: 640px) {
+    th:nth-child(4), td:nth-child(4) { display: none; }
+    th, td { padding: 10px 8px; }
+    /* Too narrow for four buttons on one line: let them wrap instead of
+       spilling out of the card. */
+    th:nth-child(6), td:nth-child(6) { width: 176px; white-space: normal; }
+    .link, .danger, .ghost { padding: 5px 6px; }
+  }
   @media (max-width: 820px) { .form-grid { grid-template-columns: 1fr 1fr; } header { flex-direction: column; align-items: flex-start; } }
   @media (max-width: 560px) { .form-grid { grid-template-columns: 1fr; } main { padding: 16px; } }
   label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 5px; font-weight: 550; }
@@ -367,11 +385,15 @@ export function renderWebUi(): string {
       var live = statusOf(t.name);
       var exited = live ? null : exitedOf(t.name);
       var rowBusy = state.rowBusy === t.name;
-      var pill = live
-        ? '<span class="pill on"><span class="dot"></span>运行中' + (live.pid ? " · pid " + live.pid : "") + "</span>"
-        : exited
-          ? '<span class="pill down" title="进程已退出，点“日志”看原因"><span class="dot"></span>已断开' + (exited.pid ? " · 原 pid " + exited.pid : "") + "</span>"
-          : '<span class="pill off"><span class="dot"></span>未运行</span>';
+      var pill;
+      if (live) {
+        pill = '<span class="pill on"><span class="dot"></span>运行中' + (live.pid ? " · pid " + live.pid : "") + "</span>";
+      } else if (exited) {
+        var deadTitle = "进程已退出（原 pid " + (exited.pid || "-") + "），点日志看原因";
+        pill = '<span class="pill down" title="' + deadTitle + '"><span class="dot"></span>已断开</span>';
+      } else {
+        pill = '<span class="pill off"><span class="dot"></span>未运行</span>';
+      }
       var local = live && live.localPort ? live.localPort : (t.localPort || "随机");
       var toggle = rowBusy
         ? '<button class="link" disabled><span class="spin"></span>' + (live ? "停止" : "启动") + "</button>"
@@ -380,10 +402,10 @@ export function renderWebUi(): string {
           : '<button class="link start" data-start="' + i + '">启动</button>';
       return "<tr>" +
         "<td>" + pill + "</td>" +
-        '<td class="cell-target"><strong>' + esc(t.name) + "</strong></td>" +
-        '<td class="mono cell-target">' + esc(t.targetHost) + ":" + esc(t.targetPort) + "</td>" +
+        '<td class="cell-target"><strong title="' + esc(t.name) + '">' + esc(t.name) + "</strong></td>" +
+        '<td class="mono cell-target" title="' + esc(t.targetHost) + ":" + esc(t.targetPort) + '">' + esc(t.targetHost) + ":" + esc(t.targetPort) + "</td>" +
         '<td class="mono">' + esc(local) + "</td>" +
-        '<td class="mono cell-target">' + esc(t.bastion || "直连") + "</td>" +
+        '<td class="mono cell-target" title="' + esc(t.bastion || "直连") + '">' + esc(t.bastion || "直连") + "</td>" +
         '<td style="text-align:right;white-space:nowrap">' +
           toggle +
           '<button class="link" data-log="' + i + '">日志</button>' +
