@@ -2,12 +2,20 @@ import { MoleHole } from './types';
 import fs from 'fs';
 import path from 'path';
 
-const STATE_FILE = path.resolve(process.env.HOME || '', '.mole_holes.json');
+/**
+ * Resolved on every call (not at import time) so the location follows HOME:
+ * the detached web UI and the tests both run with a different HOME than the
+ * CLI that started them.
+ */
+function stateFile(): string {
+  return path.resolve(process.env.HOME || '', '.mole_holes.json');
+}
 
 export function loadState(): MoleHole[] {
-  if (!fs.existsSync(STATE_FILE)) return [];
+  const file = stateFile();
+  if (!fs.existsSync(file)) return [];
   try {
-    const data = fs.readFileSync(STATE_FILE, 'utf-8');
+    const data = fs.readFileSync(file, 'utf-8');
     return JSON.parse(data) as MoleHole[];
   } catch (e) {
     return [];
@@ -15,5 +23,7 @@ export function loadState(): MoleHole[] {
 }
 
 export function saveState(state: MoleHole[]) {
-  fs.writeFileSync(STATE_FILE, JSON.stringify(state, null, 2), 'utf-8');
+  const file = stateFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  fs.writeFileSync(file, JSON.stringify(state, null, 2), 'utf-8');
 }

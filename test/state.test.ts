@@ -4,7 +4,9 @@ import path from 'path';
 import { MoleHole } from '../src/types';
 
 describe('state', () => {
-  const testFile = path.resolve(__dirname, '.mole_holes_test.json');
+  // saveState() derives the file from HOME at call time, so cleanup has to
+  // point at the file it actually writes.
+  const testFile = path.resolve(__dirname, '.mole_holes.json');
   const oldEnv = process.env.HOME;
 
   beforeAll(() => {

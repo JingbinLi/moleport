@@ -184,6 +184,56 @@ Supports both array and object style TOML (e.g., `tunnels = [...]`). This makes 
 
 Batch creation is resilient: when one tunnel cannot be created (its local port is already held by a leftover tunnel or another process, or the bastion is too slow), the remaining tunnels are still created, the state file keeps every tunnel that succeeded, the failures are listed on stderr, and the process exits with status `1`. Slow hops are also detected up front: an occupied local port fails fast with a clear message instead of a validation timeout.
 
+### 2.8 Configure the TOML File in the Browser (web UI)
+
+Every `--toml` run also brings up a small local web UI for editing that same file:
+
+```sh
+moleport --toml ~/workspace/cfg/tunnels.toml
+# ...
+# 🌐 web UI started: http://127.0.0.1:7788
+```
+
+Open that URL to:
+
+- see every configured tunnel with its live status (running / stopped, pid, actual local port);
+- add, edit and delete tunnels in a form — no TOML syntax to get wrong;
+- **保存** — write the list back to the TOML file; the previous content is always kept next to it as `tunnels.toml.bak`;
+- **保存并应用** — save, then close the current tunnels and recreate them from the new file, i.e. exactly what re-running `moleport --toml ...` does.
+
+Re-running the command is safe and cheap:
+
+| situation | behaviour |
+| --- | --- |
+| no UI running | a detached UI is started and its URL is printed |
+| UI already serving the same file | reused — prints `web UI already running`, nothing restarts |
+| UI serving a different file | the old one is stopped, a new one is started for the new file |
+| `--web-restart` given | force stop + start |
+
+Flags, available on every `--toml` command and on `moleport web`:
+
+| flag | meaning |
+| --- | --- |
+| `--web-port <port>` | preferred port, default `7788` (or `$MOLEPORT_WEB_PORT`); a free port is picked when it is taken |
+| `--no-web` | do not start the UI |
+| `--web-restart` | restart the UI even if it is already running |
+| `--web-open` | open the UI in the default browser |
+
+Manage the UI explicitly:
+
+```sh
+moleport web --toml ~/workspace/cfg/tunnels.toml   # run it in the foreground
+moleport web --status                              # where is it?
+moleport web --stop                                # stop it
+```
+
+Notes:
+
+- It binds `127.0.0.1` only, so nothing is exposed to the network.
+- The detached process keeps running after the CLI exits; its lock file is `~/.moleport-web.json` and its log is `~/.moleport-web.log`.
+- Saving rewrites the file, so comments inside it are not preserved (TOML parsers drop them). The `.bak` copy is the safety net.
+- The UI never overwrites a file it could not parse: when the TOML is invalid, saving is disabled in the page and the parse errors are shown.
+
 ---
 
 ## 3. API
