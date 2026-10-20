@@ -222,9 +222,10 @@ Flags, available on every `--toml` command and on `moleport web`:
 Manage the UI explicitly:
 
 ```sh
-moleport web --toml ~/workspace/cfg/tunnels.toml   # run it in the foreground
-moleport web --status                              # where is it?
-moleport web --stop                                # stop it
+moleport web --toml ~/workspace/cfg/tunnels.toml            # run it in the foreground
+moleport web --toml ~/workspace/cfg/tunnels.toml --detach   # background, tunnels untouched
+moleport web --status                                       # where is it?
+moleport web --stop                                         # stop it
 ```
 
 Notes:

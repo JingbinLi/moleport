@@ -278,6 +278,8 @@ program
   .option("-t, --toml <tomlPath>", "TOML config file to edit")
   .option("-p, --port <port>", WEB_PORT_DESCRIPTION)
   .option("--open", "Open the web config UI in the default browser")
+  .option("--detach", "Start the UI in the background, leaving the running tunnels untouched")
+  .option("--restart", "With --detach: replace an already running UI")
   .option("--stop", "Stop a running web config UI instead of starting one")
   .option("--status", "Show whether a web config UI is running")
   .action(async (options) => {
@@ -307,6 +309,21 @@ program
       process.exit(1);
     }
     const port = options.port ? Number(options.port) : webPortFrom({}) ?? DEFAULT_WEB_PORT;
+
+    if (options.detach) {
+      const { ensureWebUi } = await import("./web-server");
+      const result = await ensureWebUi({
+        tomlPath: options.toml,
+        port,
+        restart: options.restart === true,
+        open: options.open === true,
+      });
+      const label = result.reused ? "already running" : result.replaced ? "restarted" : "started";
+      console.log(`web UI ${label}: ${result.url}`);
+      console.log(`config: ${path.resolve(options.toml)}`);
+      return;
+    }
+
     await startWebServer({ tomlPath: options.toml, port, open: options.open });
   });
 
