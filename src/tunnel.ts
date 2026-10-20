@@ -1,6 +1,8 @@
 import { spawn } from "child_process";
+import fs from "fs";
 import getPort from "get-port";
 import { MoleHole } from "./types";
+import { startTunnelLog } from "./logs";
 
 /** Default time to keep polling a tunnel's local port until it accepts connections. */
 export const DEFAULT_TUNNEL_TIMEOUT_MS = 10000;
@@ -130,11 +132,22 @@ export async function createTunnel({
   } else {
     sshArgs.push(targetHost);
   }
+  // Keep ssh's stderr: when a tunnel dies later (network drop, bastion reboot,
+  // key rotation) this file is the only explanation the user can get.
+  const logFd = startTunnelLog(name, `ssh ${sshArgs.join(" ")}`);
   return new Promise<MoleHole>((resolve, reject) => {
     const proc = spawn("ssh", sshArgs, {
       detached: true,
-      stdio: "ignore",
+      stdio: ["ignore", logFd ?? "ignore", logFd ?? "ignore"],
     });
+    if (logFd !== undefined) {
+      // The child holds its own copy of the descriptor.
+      try {
+        fs.closeSync(logFd);
+      } catch {
+        /* ignore */
+      }
+    }
     let settled = false;
     const finish = (error?: Error, killProcess = false) => {
       if (settled) return;

@@ -199,6 +199,7 @@ Open that URL to:
 - see every configured tunnel with its live status (running / stopped, pid, actual local port);
 - add, edit and delete tunnels in a form — no TOML syntax to get wrong;
 - **启动 / 停止** per row — bring one tunnel up or down without touching the rest; deleting a running row stops it first;
+- **已断开 + 日志** — a tunnel that was started and whose `ssh` process has since died is marked 已断开 instead of 未运行, and 日志 shows the tail of that ssh process's output (connection reset, host key change, key rejected, ...);
 - **保存** — write the list back to the TOML file; the previous content is always kept next to it as `tunnels.toml.bak`;
 - **保存并应用** — save, then close the current tunnels and recreate them from the new file, i.e. exactly what re-running `moleport --toml ...` does.
 
@@ -233,6 +234,8 @@ Notes:
 
 - It binds `127.0.0.1` only, so nothing is exposed to the network.
 - The detached process keeps running after the CLI exits; its lock file is `~/.moleport-web.json` and its log is `~/.moleport-web.log`.
+- Every tunnel gets its own `ssh` log at `~/.moleport-logs/<name>.log`, truncated each time that tunnel is started. That file is what the 日志 button shows and what explains a 已断开 tunnel.
+- A tunnel is a plain `ssh` process: it needs the bastion to be reachable and your SSH key to be valid, **not** a live AWS CLI session. Expiring `aws sso login` / `aws login` credentials do not drop existing tunnels.
 - Saving rewrites the file, so comments inside it are not preserved (TOML parsers drop them). The `.bak` copy is the safety net.
 - The UI never overwrites a file it could not parse: when the TOML is invalid, saving is disabled in the page and the parse errors are shown.
 

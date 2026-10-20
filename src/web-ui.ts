@@ -90,6 +90,12 @@ export function renderWebUi(): string {
   .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 550; white-space: nowrap; }
   .pill.on { background: var(--green-weak); color: var(--green); }
   .pill.off { background: #f1f3f6; color: var(--muted); }
+  .pill.down { background: var(--amber-weak); color: var(--amber); }
+  .modal { position: fixed; inset: 0; background: rgba(17, 24, 39, .45); display: grid; place-items: center; padding: 24px; z-index: 50; }
+  .modal-card { background: #fff; border-radius: 12px; width: min(880px, 100%); max-height: 78vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 24px 60px -20px rgba(0, 0, 0, .45); }
+  .modal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--border); }
+  .modal-head h3 { margin: 0; font-size: 14px; font-weight: 650; }
+  .log { margin: 0; padding: 16px 18px; overflow: auto; background: #0b1020; color: #d7e0f5; font: 12.5px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; word-break: break-word; min-height: 80px; }
   .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
   .badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: var(--amber-weak); color: var(--amber); }
   .hidden { display: none !important; }
@@ -190,6 +196,18 @@ export function renderWebUi(): string {
     </div>
   </section>
 </main>
+<div id="logModal" class="modal hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h3 id="logTitle">日志</h3>
+      <div style="display:flex;gap:10px;align-items:center">
+        <span class="muted mono" id="logPath" style="font-size:11px"></span>
+        <button class="ghost" id="logClose">关闭</button>
+      </div>
+    </div>
+    <pre class="log" id="logBody"></pre>
+  </div>
+</div>
 <div id="toast"></div>
 <script>
 (function () {
@@ -280,6 +298,29 @@ export function renderWebUi(): string {
     return s && s.running ? s : null;
   }
 
+  /** Started at some point, but the process is gone now. */
+  function exitedOf(name) {
+    var s = state.status[name];
+    return s && s.exited ? s : null;
+  }
+
+  function showLog(name) {
+    api("/api/tunnel/log?name=" + encodeURIComponent(name)).then(function (data) {
+      $("logTitle").textContent = name + " · 最近日志";
+      $("logPath").textContent = data.path || "";
+      $("logBody").textContent = data.lines && data.lines.length
+        ? data.lines.join("\\n")
+        : "（暂无日志：这条隧道还没有启动过，或者日志文件已被清空）";
+      $("logModal").className = "modal";
+    }).catch(function (error) {
+      toast("读取日志失败：" + error.message, "error");
+    });
+  }
+
+  function hideLog() {
+    $("logModal").className = "modal hidden";
+  }
+
   function startTunnel(name) {
     if (state.rowBusy) return;
     state.rowBusy = name;
@@ -324,10 +365,13 @@ export function renderWebUi(): string {
     }
     var rows = state.tunnels.map(function (t, i) {
       var live = statusOf(t.name);
+      var exited = live ? null : exitedOf(t.name);
       var rowBusy = state.rowBusy === t.name;
       var pill = live
         ? '<span class="pill on"><span class="dot"></span>运行中' + (live.pid ? " · pid " + live.pid : "") + "</span>"
-        : '<span class="pill off"><span class="dot"></span>未运行</span>';
+        : exited
+          ? '<span class="pill down" title="进程已退出，点“日志”看原因"><span class="dot"></span>已断开' + (exited.pid ? " · 原 pid " + exited.pid : "") + "</span>"
+          : '<span class="pill off"><span class="dot"></span>未运行</span>';
       var local = live && live.localPort ? live.localPort : (t.localPort || "随机");
       var toggle = rowBusy
         ? '<button class="link" disabled><span class="spin"></span>' + (live ? "停止" : "启动") + "</button>"
@@ -342,6 +386,7 @@ export function renderWebUi(): string {
         '<td class="mono cell-target">' + esc(t.bastion || "直连") + "</td>" +
         '<td style="text-align:right;white-space:nowrap">' +
           toggle +
+          '<button class="link" data-log="' + i + '">日志</button>' +
           '<button class="link" data-edit="' + i + '">编辑</button>' +
           '<button class="danger" data-remove="' + i + '">删除</button>' +
         "</td>" +
@@ -359,6 +404,11 @@ export function renderWebUi(): string {
     Array.prototype.forEach.call(document.querySelectorAll("[data-stop]"), function (btn) {
       btn.addEventListener("click", function () {
         stopTunnel(state.tunnels[Number(btn.getAttribute("data-stop"))].name, false);
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-log]"), function (btn) {
+      btn.addEventListener("click", function () {
+        showLog(state.tunnels[Number(btn.getAttribute("data-log"))].name);
       });
     });
     Array.prototype.forEach.call(document.querySelectorAll("[data-edit]"), function (btn) {
@@ -508,6 +558,13 @@ export function renderWebUi(): string {
   });
 
   $("cancelEditBtn").addEventListener("click", function () { setEditing(-1); });
+  $("logClose").addEventListener("click", hideLog);
+  $("logModal").addEventListener("click", function (event) {
+    if (event.target === $("logModal")) hideLog();
+  });
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape") hideLog();
+  });
   $("saveBtn").addEventListener("click", doSave);
   $("applyBtn").addEventListener("click", doApply);
   $("refreshBtn").addEventListener("click", function () {

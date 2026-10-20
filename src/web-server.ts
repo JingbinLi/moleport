@@ -9,6 +9,7 @@ import { createTunnelsBatch } from "./batch";
 import { startSingleTunnel, stopSingleTunnel } from "./tunnel-actions";
 import { renderWebUi } from "./web-ui";
 import { getVersion } from "./version";
+import { readTunnelLogTail, tunnelLogPath } from "./logs";
 import {
   formatIssues,
   loadTunnelsFromFile,
@@ -86,27 +87,37 @@ function sendJson(res: http.ServerResponse, status: number, payload: unknown): v
   res.end(body);
 }
 
-/** Match running state entries to config entries by tunnel name. */
+/**
+ * Match state entries to config entries by tunnel name.
+ *
+ * Three states matter to the page: `running` (pid alive), `exited` (it was
+ * started but the process is gone - network drop, bastion reboot, ...), and
+ * neither (never started here, or stopped cleanly: stopping drops the entry).
+ */
 function buildStatus(tomlPath: string) {
   const config = readTunnelConfigFile(tomlPath);
-  const running: MoleHole[] = loadState();
-  const byName = new Map<string, MoleHole>();
-  running.forEach((entry) => {
-    if (isProcessAlive(entry.pid)) byName.set(entry.name, entry);
+  const tracked: MoleHole[] = loadState();
+  const liveByName = new Map<string, MoleHole>();
+  const deadByName = new Map<string, MoleHole>();
+  tracked.forEach((entry) => {
+    (isProcessAlive(entry.pid) ? liveByName : deadByName).set(entry.name, entry);
   });
 
   const tunnels = config.tunnels.map((tunnel) => {
-    const live = byName.get(tunnel.name);
+    const live = liveByName.get(tunnel.name);
+    const dead = deadByName.get(tunnel.name);
+    const entry = live ?? dead;
     return {
       ...tunnel,
       running: Boolean(live),
-      pid: live ? live.pid : null,
+      exited: !live && Boolean(dead),
+      pid: entry ? entry.pid : null,
       localPort: live ? live.localPort : tunnel.localPort ?? null,
     };
   });
 
   const known = new Set(config.tunnels.map((t) => t.name));
-  const orphans = running
+  const orphans = tracked
     .filter((entry) => !known.has(entry.name) && isProcessAlive(entry.pid))
     .map((entry) => ({ name: entry.name, localPort: entry.localPort, pid: entry.pid }));
 
@@ -261,6 +272,12 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       const body = await readJsonBody(req);
       const result = await startSingleTunnel(tomlPath, String(body?.name ?? ""));
       sendJson(res, result.code, result);
+      return;
+    }
+    case "GET /api/tunnel/log": {
+      const name = url.searchParams.get("name") || "";
+      const file = tunnelLogPath(name);
+      sendJson(res, 200, { name, path: file, lines: readTunnelLogTail(file) });
       return;
     }
     case "POST /api/tunnel/stop": {
