@@ -76,6 +76,10 @@ export function renderWebUi(): string {
   .danger:hover:not(:disabled) { background: var(--red-weak); }
   .link { background: transparent; color: var(--accent); border-color: transparent; padding: 6px 8px; }
   .link:hover:not(:disabled) { background: var(--accent-weak); }
+  .link.start { color: var(--green); }
+  .link.start:hover:not(:disabled) { background: var(--green-weak); }
+  .link.stop { color: var(--red); }
+  .link.stop:hover:not(:disabled) { background: var(--red-weak); }
   table { width: 100%; border-collapse: collapse; }
   th, td { text-align: left; padding: 11px 12px; border-bottom: 1px solid #f0f2f5; vertical-align: middle; }
   th { font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
@@ -189,7 +193,7 @@ export function renderWebUi(): string {
 <div id="toast"></div>
 <script>
 (function () {
-  var state = { tunnels: [], path: "", dirty: false, editing: -1, status: {}, busy: false, configErrors: [] };
+  var state = { tunnels: [], path: "", dirty: false, editing: -1, status: {}, busy: false, rowBusy: null, configErrors: [] };
   var $ = function (id) { return document.getElementById(id); };
 
   function esc(value) {
@@ -276,6 +280,42 @@ export function renderWebUi(): string {
     return s && s.running ? s : null;
   }
 
+  function startTunnel(name) {
+    if (state.rowBusy) return;
+    state.rowBusy = name;
+    renderTable();
+    api("/api/tunnel/start", { method: "POST", body: { name: name } }).then(function (result) {
+      if (result.reason === "already-running") {
+        toast(name + " 已经在运行", "ok");
+      } else {
+        var port = result.tunnel && result.tunnel.localPort ? "（本地端口 " + result.tunnel.localPort + "）" : "";
+        toast(name + " 已启动" + port, "ok");
+      }
+    }).catch(function (error) {
+      toast("启动失败：" + error.message, "error");
+    }).then(finishRowAction);
+  }
+
+  function stopTunnel(name, silent) {
+    if (state.rowBusy) return Promise.resolve(null);
+    state.rowBusy = name;
+    renderTable();
+    return api("/api/tunnel/stop", { method: "POST", body: { name: name } }).then(function (result) {
+      if (!silent) {
+        toast(result.reason === "not-running" ? name + " 本来就没有在运行" : name + " 已停止", "ok");
+      }
+      return result;
+    }).catch(function (error) {
+      if (!silent) toast("停止失败：" + error.message, "error");
+      return null;
+    }).then(finishRowAction);
+  }
+
+  function finishRowAction() {
+    state.rowBusy = null;
+    return loadStatus();
+  }
+
   function renderTable() {
     $("count").textContent = state.tunnels.length ? "(" + state.tunnels.length + ")" : "";
     if (!state.tunnels.length) {
@@ -284,10 +324,16 @@ export function renderWebUi(): string {
     }
     var rows = state.tunnels.map(function (t, i) {
       var live = statusOf(t.name);
+      var rowBusy = state.rowBusy === t.name;
       var pill = live
         ? '<span class="pill on"><span class="dot"></span>运行中' + (live.pid ? " · pid " + live.pid : "") + "</span>"
         : '<span class="pill off"><span class="dot"></span>未运行</span>';
       var local = live && live.localPort ? live.localPort : (t.localPort || "随机");
+      var toggle = rowBusy
+        ? '<button class="link" disabled><span class="spin"></span>' + (live ? "停止" : "启动") + "</button>"
+        : live
+          ? '<button class="link stop" data-stop="' + i + '">停止</button>'
+          : '<button class="link start" data-start="' + i + '">启动</button>';
       return "<tr>" +
         "<td>" + pill + "</td>" +
         '<td class="cell-target"><strong>' + esc(t.name) + "</strong></td>" +
@@ -295,6 +341,7 @@ export function renderWebUi(): string {
         '<td class="mono">' + esc(local) + "</td>" +
         '<td class="mono cell-target">' + esc(t.bastion || "直连") + "</td>" +
         '<td style="text-align:right;white-space:nowrap">' +
+          toggle +
           '<button class="link" data-edit="' + i + '">编辑</button>' +
           '<button class="danger" data-remove="' + i + '">删除</button>' +
         "</td>" +
@@ -304,6 +351,16 @@ export function renderWebUi(): string {
       "<table><thead><tr><th>状态</th><th>名称</th><th>目标</th><th>本地端口</th><th>跳板机</th><th></th></tr></thead><tbody>" +
       rows.join("") + "</tbody></table>";
 
+    Array.prototype.forEach.call(document.querySelectorAll("[data-start]"), function (btn) {
+      btn.addEventListener("click", function () {
+        startTunnel(state.tunnels[Number(btn.getAttribute("data-start"))].name);
+      });
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("[data-stop]"), function (btn) {
+      btn.addEventListener("click", function () {
+        stopTunnel(state.tunnels[Number(btn.getAttribute("data-stop"))].name, false);
+      });
+    });
     Array.prototype.forEach.call(document.querySelectorAll("[data-edit]"), function (btn) {
       btn.addEventListener("click", function () { setEditing(Number(btn.getAttribute("data-edit"))); });
     });
@@ -311,12 +368,24 @@ export function renderWebUi(): string {
       btn.addEventListener("click", function () {
         var index = Number(btn.getAttribute("data-remove"));
         var tunnel = state.tunnels[index];
-        if (!window.confirm("删除隧道 " + tunnel.name + "？")) return;
-        state.tunnels.splice(index, 1);
-        setDirty(true);
-        if (state.editing === index) setEditing(-1);
-        renderTable();
-        toast("已从列表移除，点击保存后写入文件");
+        var live = statusOf(tunnel.name);
+        var question = live
+          ? "隧道 " + tunnel.name + " 正在运行，删除并停止它？"
+          : "删除隧道 " + tunnel.name + "？";
+        if (!window.confirm(question)) return;
+        var removeFromList = function () {
+          state.tunnels.splice(index, 1);
+          setDirty(true);
+          if (state.editing === index) setEditing(-1);
+          renderTable();
+          toast("已从列表移除，点击保存后写入文件");
+        };
+        if (live) {
+          // Keep the runtime honest: a deleted row must not leave a live tunnel behind.
+          stopTunnel(tunnel.name, true).then(removeFromList);
+        } else {
+          removeFromList();
+        }
       });
     });
   }

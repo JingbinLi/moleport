@@ -243,3 +243,27 @@ export function loadTunnelsFromFile(filePath: string): TunnelConfig[] {
   }
   return tunnels;
 }
+
+export interface TunnelConfigFile {
+  exists: boolean;
+  tunnels: TunnelConfig[];
+  errors: ValidationIssue[];
+}
+
+/**
+ * Read the config file without throwing: a broken file is reported as errors so
+ * the UI can show them instead of overwriting the user's work.
+ */
+export function readTunnelConfigFile(filePath: string): TunnelConfigFile {
+  const resolved = path.resolve(filePath);
+  if (!fs.existsSync(resolved)) {
+    return { exists: false, tunnels: [], errors: [] };
+  }
+  try {
+    const text = fs.readFileSync(resolved, "utf-8");
+    const { tunnels, errors } = validateTunnels(parseTunnelConfig(text));
+    return { exists: true, tunnels, errors };
+  } catch (error: any) {
+    return { exists: true, tunnels: [], errors: [{ index: -1, message: error?.message || String(error) }] };
+  }
+}

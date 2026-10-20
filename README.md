@@ -198,6 +198,7 @@ Open that URL to:
 
 - see every configured tunnel with its live status (running / stopped, pid, actual local port);
 - add, edit and delete tunnels in a form — no TOML syntax to get wrong;
+- **启动 / 停止** per row — bring one tunnel up or down without touching the rest; deleting a running row stops it first;
 - **保存** — write the list back to the TOML file; the previous content is always kept next to it as `tunnels.toml.bak`;
 - **保存并应用** — save, then close the current tunnels and recreate them from the new file, i.e. exactly what re-running `moleport --toml ...` does.
 

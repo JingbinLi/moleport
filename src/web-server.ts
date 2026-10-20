@@ -6,12 +6,13 @@ import getPort from "get-port";
 import { MoleHole } from "./types";
 import { loadState } from "./state";
 import { createTunnelsBatch } from "./batch";
+import { startSingleTunnel, stopSingleTunnel } from "./tunnel-actions";
 import { renderWebUi } from "./web-ui";
 import { getVersion } from "./version";
 import {
   formatIssues,
   loadTunnelsFromFile,
-  parseTunnelConfig,
+  readTunnelConfigFile,
   validateTunnels,
   writeTunnelConfigFile,
   TunnelConfig,
@@ -85,27 +86,9 @@ function sendJson(res: http.ServerResponse, status: number, payload: unknown): v
   res.end(body);
 }
 
-/** Read the config file, reporting parse/validation problems instead of throwing. */
-function readConfigFile(tomlPath: string): {
-  exists: boolean;
-  tunnels: TunnelConfig[];
-  errors: { index: number; message: string }[];
-} {
-  if (!fs.existsSync(tomlPath)) {
-    return { exists: false, tunnels: [], errors: [] };
-  }
-  try {
-    const text = fs.readFileSync(tomlPath, "utf-8");
-    const { tunnels, errors } = validateTunnels(parseTunnelConfig(text));
-    return { exists: true, tunnels, errors };
-  } catch (error: any) {
-    return { exists: true, tunnels: [], errors: [{ index: -1, message: error?.message || String(error) }] };
-  }
-}
-
 /** Match running state entries to config entries by tunnel name. */
 function buildStatus(tomlPath: string) {
-  const config = readConfigFile(tomlPath);
+  const config = readTunnelConfigFile(tomlPath);
   const running: MoleHole[] = loadState();
   const byName = new Map<string, MoleHole>();
   running.forEach((entry) => {
@@ -238,7 +221,7 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
       return;
     }
     case "GET /api/config": {
-      const config = readConfigFile(tomlPath);
+      const config = readTunnelConfigFile(tomlPath);
       sendJson(res, 200, {
         path: tomlPath,
         exists: config.exists,
@@ -272,6 +255,18 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
         concurrency: 4,
       });
       sendJson(res, 200, { created, failures, tookMs: Date.now() - startedAt });
+      return;
+    }
+    case "POST /api/tunnel/start": {
+      const body = await readJsonBody(req);
+      const result = await startSingleTunnel(tomlPath, String(body?.name ?? ""));
+      sendJson(res, result.code, result);
+      return;
+    }
+    case "POST /api/tunnel/stop": {
+      const body = await readJsonBody(req);
+      const result = await stopSingleTunnel(String(body?.name ?? ""));
+      sendJson(res, result.code, result);
       return;
     }
     case "GET /api/status": {

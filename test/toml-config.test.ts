@@ -4,6 +4,7 @@ import {
   formatIssues,
   loadTunnelsFromFile,
   parseTunnelConfig,
+  readTunnelConfigFile,
   serializeTunnelConfig,
   validateTunnels,
   writeTunnelConfigFile,
@@ -113,6 +114,21 @@ describe("toml-config", () => {
     expect(fs.readFileSync(result.backup!, "utf-8")).toBe(SAMPLE);
     expect(loadTunnelsFromFile(file)).toHaveLength(1);
     expect(fs.existsSync(`${file}.tmp`)).toBe(false);
+  });
+
+  it("readTunnelConfigFile reports problems instead of throwing", () => {
+    expect(readTunnelConfigFile(path.join(tmpDir, "missing.toml"))).toEqual({
+      exists: false,
+      tunnels: [],
+      errors: [],
+    });
+
+    const broken = path.join(tmpDir, "broken.toml");
+    fs.writeFileSync(broken, 'tunnels = "not an array"\n', "utf-8");
+    const result = readTunnelConfigFile(broken);
+    expect(result.exists).toBe(true);
+    expect(result.tunnels).toEqual([]);
+    expect(result.errors.length).toBeGreaterThan(0);
   });
 
   it("loadTunnelsFromFile throws a readable message for invalid entries", () => {
