@@ -2,7 +2,7 @@ import fs from "fs";
 import net from "net";
 import path from "path";
 import { ChildProcess, spawn } from "child_process";
-import { startSingleTunnel, stopSingleTunnel } from "../src/tunnel-actions";
+import { startAllTunnels, startSingleTunnel, stopSingleTunnel } from "../src/tunnel-actions";
 import { loadState, saveState } from "../src/state";
 import { isProcessAlive } from "../src/web-lock";
 
@@ -122,6 +122,40 @@ describe("single tunnel actions", () => {
     expect(await waitFor(() => !isProcessAlive(firstPid))).toBe(true);
     expect(isProcessAlive(secondPid)).toBe(true);
     expect(loadState().map((t) => t.name)).toEqual(["b"]);
+  });
+
+
+  it("starts all: skips the live tunnels and keeps going past a failure", async () => {
+    const pid = liveChild();
+    const listener = await listenOnFreePort();
+    saveState([{ name: "live", targetHost: "h", targetPort: 1, localPort: 2, pid }]);
+    writeConfig(
+      `[[tunnels]]\nname = "live"\ntargetHost = "h"\ntargetPort = 3306\nlocalPort = 13306\n\n` +
+        `[[tunnels]]\nname = "blocked"\ntargetHost = "127.0.0.1"\ntargetPort = 3306\nlocalPort = ${listener.port}\n`
+    );
+    try {
+      const result = await startAllTunnels(toml);
+
+      expect(result.skipped).toEqual(["live"]);
+      expect(result.started).toEqual([]);
+      expect(result.failures.map((f) => f.name)).toEqual(["blocked"]);
+      expect(result.failures[0].error).toMatch(/already in use/);
+      // The healthy tunnel was neither signalled nor duplicated, and a failed
+      // start never lands in the state file.
+      expect(isProcessAlive(pid)).toBe(true);
+      expect(loadState().map((t) => t.name)).toEqual(["live"]);
+    } finally {
+      await listener.close();
+    }
+  });
+
+  it("starts all: rejects the whole call when the config file is invalid", async () => {
+    writeConfig('[[tunnels]]\nname = "db1"\ntargetHost = "h"\ntargetPort = "oops"\n');
+
+    const result = await startAllTunnels(toml);
+
+    expect(result).toMatchObject({ ok: false, code: 400 });
+    expect(result.error).toMatch(/config is invalid/);
   });
 
   it("drops a stale entry without signalling anything and reports not-running", async () => {

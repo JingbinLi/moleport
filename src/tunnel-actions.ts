@@ -85,3 +85,89 @@ export async function stopSingleTunnel(name: string): Promise<TunnelActionResult
     return { ok: true, code: 200, tunnel: target, reason: wasAlive ? "killed" : "stale" };
   });
 }
+
+export interface StartAllFailure {
+  name: string;
+  error: string;
+}
+
+export interface StartAllResult {
+  ok: boolean;
+  /** HTTP status the route reports for this outcome. */
+  code: number;
+  error?: string;
+  /** Tunnels this call actually brought up. */
+  started: MoleHole[];
+  /** Tunnels left alone because they were already running (or already starting). */
+  skipped: string[];
+  failures: StartAllFailure[];
+  tookMs: number;
+}
+
+/** How many tunnels "start all" brings up at once - keeps the ssh fan-out modest. */
+export const START_ALL_CONCURRENCY = 4;
+
+/**
+ * Bring up every tunnel in the config file that is not running yet.
+ *
+ * Unlike `moleport --toml` (and the page's "保存并应用"), this is additive: a
+ * tunnel that is already running is skipped, never restarted, so one dropped
+ * tunnel can be recovered without touching the healthy ones. Every tunnel goes
+ * through startSingleTunnel, so the double-click guard and the state
+ * bookkeeping stay in one place.
+ */
+export async function startAllTunnels(tomlPath: string): Promise<StartAllResult> {
+  const startedAt = Date.now();
+  const config = readTunnelConfigFile(tomlPath);
+  if (config.errors.length > 0) {
+    return {
+      ok: false,
+      code: 400,
+      error: `config is invalid: ${formatIssues(config.errors)}`,
+      started: [],
+      skipped: [],
+      failures: [],
+      tookMs: Date.now() - startedAt,
+    };
+  }
+
+  const running = new Set(
+    loadState()
+      .filter((entry) => isProcessAlive(entry.pid))
+      .map((entry) => entry.name)
+  );
+  const skipped = config.tunnels.filter((t) => running.has(t.name)).map((t) => t.name);
+  const pending = config.tunnels.filter((t) => !running.has(t.name));
+
+  const started: MoleHole[] = [];
+  const failures: StartAllFailure[] = [];
+  let cursor = 0;
+
+  const worker = async (): Promise<void> => {
+    while (cursor < pending.length) {
+      const cfg = pending[cursor++];
+      // eslint-disable-next-line no-await-in-loop
+      const result = await startSingleTunnel(tomlPath, cfg.name);
+      if (result.ok && result.tunnel && result.reason === "started") {
+        started.push(result.tunnel);
+      } else if (result.ok || result.code === 409) {
+        // Already running, or a concurrent click got there first: leave it alone.
+        skipped.push(cfg.name);
+      } else {
+        failures.push({ name: cfg.name, error: result.error || "start failed" });
+      }
+    }
+  };
+
+  const workers = Math.max(1, Math.min(START_ALL_CONCURRENCY, pending.length || 1));
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+
+  return {
+    ok: failures.length === 0,
+    code: 200,
+    started,
+    skipped,
+    failures,
+    tookMs: Date.now() - startedAt,
+  };
+}

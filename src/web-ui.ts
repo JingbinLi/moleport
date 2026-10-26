@@ -167,7 +167,10 @@ export function renderWebUi(): string {
   <section class="card">
     <div class="card-head">
       <h2>隧道列表 <span class="muted" id="count"></span></h2>
-      <span class="badge hidden" id="dirtyBadge">未保存</span>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span class="badge hidden" id="dirtyBadge">未保存</span>
+        <button class="ghost" id="startAllBtn" title="启动所有未运行的隧道，已在运行的会跳过">启动全部</button>
+      </div>
     </div>
     <div id="tableHost"></div>
   </section>
@@ -229,7 +232,7 @@ export function renderWebUi(): string {
 <div id="toast"></div>
 <script>
 (function () {
-  var state = { tunnels: [], path: "", dirty: false, editing: -1, status: {}, busy: false, rowBusy: null, configErrors: [] };
+  var state = { tunnels: [], path: "", dirty: false, editing: -1, status: {}, busy: false, rowBusy: null, startingAll: false, configErrors: [] };
   var $ = function (id) { return document.getElementById(id); };
 
   function esc(value) {
@@ -340,7 +343,7 @@ export function renderWebUi(): string {
   }
 
   function startTunnel(name) {
-    if (state.rowBusy) return;
+    if (state.rowBusy || state.startingAll) return;
     state.rowBusy = name;
     renderTable();
     api("/api/tunnel/start", { method: "POST", body: { name: name } }).then(function (result) {
@@ -375,7 +378,59 @@ export function renderWebUi(): string {
     return loadStatus();
   }
 
+  /** Rows with no live process right now - exactly what "启动全部" would start. */
+  function startableCount() {
+    return state.tunnels.filter(function (t) { return !statusOf(t.name); }).length;
+  }
+
+  function syncStartAllBtn() {
+    var btn = $("startAllBtn");
+    if (!btn) return;
+    if (state.startingAll) {
+      btn.innerHTML = '<span class="spin"></span>启动中';
+      btn.disabled = true;
+      return;
+    }
+    var pending = startableCount();
+    btn.innerHTML = "启动全部";
+    btn.disabled = state.busy || !state.tunnels.length || pending === 0;
+    btn.title = !state.tunnels.length
+      ? "还没有隧道"
+      : pending === 0
+        ? "所有隧道都已在运行"
+        : "启动 " + pending + " 条未运行的隧道，已在运行的会跳过";
+  }
+
+  /**
+   * Additive on purpose: bring up every tunnel that is down and leave the
+   * running ones alone - "保存并应用" is the one that rebuilds everything.
+   */
+  function doStartAll() {
+    if (state.busy || state.startingAll) return;
+    if (!startableCount()) return;
+    state.startingAll = true;
+    syncStartAllBtn();
+    api("/api/tunnel/start-all", { method: "POST" }).then(function (result) {
+      var started = (result.started || []).length;
+      var skipped = (result.skipped || []).length;
+      var failures = result.failures || [];
+      if (failures.length) {
+        toast("已启动 " + started + " 条，" + failures.length + " 条失败（" +
+          failures.map(function (f) { return f.name; }).join("、") + "），点“日志”看原因", "error");
+      } else {
+        toast("已启动 " + started + " 条隧道" +
+          (skipped ? "，跳过 " + skipped + " 条已在运行的" : ""), "ok");
+      }
+    }).catch(function (error) {
+      toast("启动全部失败：" + error.message, "error");
+    }).then(function () {
+      state.startingAll = false;
+      return loadStatus();
+    });
+  }
+
   function renderTable() {
+    syncStartAllBtn();
     $("count").textContent = state.tunnels.length ? "(" + state.tunnels.length + ")" : "";
     if (!state.tunnels.length) {
       $("tableHost").innerHTML = '<div class="empty">还没有隧道，用下面的表单添加第一条。</div>';
@@ -510,6 +565,7 @@ export function renderWebUi(): string {
     $("submitBtn").disabled = busy;
     $("saveBtn").disabled = blocked;
     $("applyBtn").disabled = blocked;
+    syncStartAllBtn();
     $("saveBtn").innerHTML = busy && label === "save" ? '<span class="spin"></span>保存中' : "保存";
     $("applyBtn").innerHTML = busy && label === "apply" ? '<span class="spin"></span>应用中' : "保存并应用";
   }
@@ -589,6 +645,7 @@ export function renderWebUi(): string {
   });
   $("saveBtn").addEventListener("click", doSave);
   $("applyBtn").addEventListener("click", doApply);
+  $("startAllBtn").addEventListener("click", doStartAll);
   $("refreshBtn").addEventListener("click", function () {
     if (state.dirty && !window.confirm("有未保存的修改，刷新会丢弃，继续？")) return;
     load();

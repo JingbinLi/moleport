@@ -26,6 +26,14 @@ describe("web-ui", () => {
     expect(html).toContain('id="logBody"');
   });
 
+  it("offers a start-all control next to the list", () => {
+    const html = renderWebUi();
+    expect(html).toContain('id="startAllBtn"');
+    expect(html).toContain("启动全部");
+    // rendered is not enough: the button has to be wired to its handler
+    expect(html).toContain('$("startAllBtn").addEventListener("click", doStartAll)');
+  });
+
   it("keeps the delete action inside a fixed layout", () => {
     const html = renderWebUi();
     expect(html).toContain("table-layout: fixed");
