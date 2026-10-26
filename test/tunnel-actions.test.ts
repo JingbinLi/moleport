@@ -2,7 +2,7 @@ import fs from "fs";
 import net from "net";
 import path from "path";
 import { ChildProcess, spawn } from "child_process";
-import { startAllTunnels, startSingleTunnel, stopSingleTunnel } from "../src/tunnel-actions";
+import { startAllTunnels, startSingleTunnel, stopAllTunnels, stopSingleTunnel } from "../src/tunnel-actions";
 import { loadState, saveState } from "../src/state";
 import { isProcessAlive } from "../src/web-lock";
 
@@ -156,6 +156,23 @@ describe("single tunnel actions", () => {
 
     expect(result).toMatchObject({ ok: false, code: 400 });
     expect(result.error).toMatch(/config is invalid/);
+  });
+
+  it("stops all: kills every live tunnel and drops the stale entries", async () => {
+    const firstPid = liveChild();
+    const secondPid = liveChild();
+    saveState([
+      { name: "a", targetHost: "h", targetPort: 1, localPort: 2, pid: firstPid },
+      { name: "b", targetHost: "h", targetPort: 1, localPort: 3, pid: secondPid },
+      { name: "ghost", targetHost: "h", targetPort: 1, localPort: 4, pid: 999999 },
+    ]);
+
+    const result = await stopAllTunnels();
+
+    expect(result.stopped.sort()).toEqual(["a", "b"]);
+    expect(result.cleared).toEqual(["ghost"]);
+    expect(await waitFor(() => !isProcessAlive(firstPid) && !isProcessAlive(secondPid))).toBe(true);
+    expect(loadState()).toEqual([]);
   });
 
   it("drops a stale entry without signalling anything and reports not-running", async () => {

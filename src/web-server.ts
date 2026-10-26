@@ -6,7 +6,7 @@ import getPort from "get-port";
 import { MoleHole } from "./types";
 import { loadState } from "./state";
 import { createTunnelsBatch } from "./batch";
-import { startAllTunnels, startSingleTunnel, stopSingleTunnel } from "./tunnel-actions";
+import { startAllTunnels, startSingleTunnel, stopAllTunnels, stopSingleTunnel } from "./tunnel-actions";
 import { renderWebUi } from "./web-ui";
 import { getVersion } from "./version";
 import { readTunnelLogTail, tunnelLogPath } from "./logs";
@@ -282,6 +282,11 @@ async function handleRequest(req: http.IncomingMessage, res: http.ServerResponse
     }
     case "POST /api/tunnel/start-all": {
       const result = await startAllTunnels(tomlPath);
+      sendJson(res, result.code, result);
+      return;
+    }
+    case "POST /api/tunnel/stop-all": {
+      const result = await stopAllTunnels();
       sendJson(res, result.code, result);
       return;
     }

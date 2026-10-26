@@ -170,6 +170,7 @@ export function renderWebUi(): string {
       <div style="display:flex;align-items:center;gap:10px">
         <span class="badge hidden" id="dirtyBadge">未保存</span>
         <button class="ghost" id="startAllBtn" title="启动所有未运行的隧道，已在运行的会跳过">启动全部</button>
+        <button class="ghost" id="stopAllBtn" title="停止所有在运行的隧道（配置不会被修改）">停止全部</button>
       </div>
     </div>
     <div id="tableHost"></div>
@@ -232,7 +233,7 @@ export function renderWebUi(): string {
 <div id="toast"></div>
 <script>
 (function () {
-  var state = { tunnels: [], path: "", dirty: false, editing: -1, status: {}, busy: false, rowBusy: null, startingAll: false, configErrors: [] };
+  var state = { tunnels: [], path: "", dirty: false, editing: -1, status: {}, busy: false, rowBusy: null, startingAll: false, stoppingAll: false, configErrors: [] };
   var $ = function (id) { return document.getElementById(id); };
 
   function esc(value) {
@@ -343,7 +344,7 @@ export function renderWebUi(): string {
   }
 
   function startTunnel(name) {
-    if (state.rowBusy || state.startingAll) return;
+    if (state.rowBusy || state.startingAll || state.stoppingAll) return;
     state.rowBusy = name;
     renderTable();
     api("/api/tunnel/start", { method: "POST", body: { name: name } }).then(function (result) {
@@ -359,7 +360,7 @@ export function renderWebUi(): string {
   }
 
   function stopTunnel(name, silent) {
-    if (state.rowBusy) return Promise.resolve(null);
+    if (state.rowBusy || state.stoppingAll) return Promise.resolve(null);
     state.rowBusy = name;
     renderTable();
     return api("/api/tunnel/stop", { method: "POST", body: { name: name } }).then(function (result) {
@@ -383,22 +384,44 @@ export function renderWebUi(): string {
     return state.tunnels.filter(function (t) { return !statusOf(t.name); }).length;
   }
 
-  function syncStartAllBtn() {
-    var btn = $("startAllBtn");
-    if (!btn) return;
-    if (state.startingAll) {
-      btn.innerHTML = '<span class="spin"></span>启动中';
-      btn.disabled = true;
-      return;
-    }
+  /** Tunnels that are up right now - exactly what "停止全部" would stop. */
+  function runningCount() {
+    return state.tunnels.filter(function (t) { return statusOf(t.name); }).length;
+  }
+
+  function syncBulkBtns() {
+    var startBtn = $("startAllBtn");
+    var stopBtn = $("stopAllBtn");
     var pending = startableCount();
-    btn.innerHTML = "启动全部";
-    btn.disabled = state.busy || !state.tunnels.length || pending === 0;
-    btn.title = !state.tunnels.length
-      ? "还没有隧道"
-      : pending === 0
-        ? "所有隧道都已在运行"
-        : "启动 " + pending + " 条未运行的隧道，已在运行的会跳过";
+    var live = runningCount();
+
+    if (startBtn) {
+      if (state.startingAll) {
+        startBtn.innerHTML = '<span class="spin"></span>启动中';
+        startBtn.disabled = true;
+      } else {
+        startBtn.innerHTML = "启动全部";
+        startBtn.disabled = state.busy || state.stoppingAll || !state.tunnels.length || pending === 0;
+        startBtn.title = !state.tunnels.length
+          ? "还没有隧道"
+          : pending === 0
+            ? "所有隧道都已在运行"
+            : "启动 " + pending + " 条未运行的隧道，已在运行的会跳过";
+      }
+    }
+
+    if (stopBtn) {
+      if (state.stoppingAll) {
+        stopBtn.innerHTML = '<span class="spin"></span>停止中';
+        stopBtn.disabled = true;
+      } else {
+        stopBtn.innerHTML = "停止全部";
+        stopBtn.disabled = state.busy || state.startingAll || live === 0;
+        stopBtn.title = live === 0
+          ? "没有在运行的隧道"
+          : "停止 " + live + " 条在运行的隧道（配置不会被修改）";
+      }
+    }
   }
 
   /**
@@ -409,7 +432,7 @@ export function renderWebUi(): string {
     if (state.busy || state.startingAll) return;
     if (!startableCount()) return;
     state.startingAll = true;
-    syncStartAllBtn();
+    syncBulkBtns();
     api("/api/tunnel/start-all", { method: "POST" }).then(function (result) {
       var started = (result.started || []).length;
       var skipped = (result.skipped || []).length;
@@ -429,8 +452,30 @@ export function renderWebUi(): string {
     });
   }
 
+  /**
+   * Stop every running tunnel. The config file is untouched: the rows stay and
+   * go back to 未运行, so "启动全部" can bring them back later.
+   */
+  function doStopAll() {
+    if (state.busy || state.startingAll || state.stoppingAll) return;
+    var live = runningCount();
+    if (!live) return;
+    if (!window.confirm("停止全部 " + live + " 条隧道？配置会保留，之后可以再启动。")) return;
+    state.stoppingAll = true;
+    syncBulkBtns();
+    api("/api/tunnel/stop-all", { method: "POST" }).then(function (result) {
+      var stopped = (result.stopped || []).length;
+      toast("已停止 " + stopped + " 条隧道", "ok");
+    }).catch(function (error) {
+      toast("停止全部失败：" + error.message, "error");
+    }).then(function () {
+      state.stoppingAll = false;
+      return loadStatus();
+    });
+  }
+
   function renderTable() {
-    syncStartAllBtn();
+    syncBulkBtns();
     $("count").textContent = state.tunnels.length ? "(" + state.tunnels.length + ")" : "";
     if (!state.tunnels.length) {
       $("tableHost").innerHTML = '<div class="empty">还没有隧道，用下面的表单添加第一条。</div>';
@@ -565,7 +610,7 @@ export function renderWebUi(): string {
     $("submitBtn").disabled = busy;
     $("saveBtn").disabled = blocked;
     $("applyBtn").disabled = blocked;
-    syncStartAllBtn();
+    syncBulkBtns();
     $("saveBtn").innerHTML = busy && label === "save" ? '<span class="spin"></span>保存中' : "保存";
     $("applyBtn").innerHTML = busy && label === "apply" ? '<span class="spin"></span>应用中' : "保存并应用";
   }
@@ -646,6 +691,7 @@ export function renderWebUi(): string {
   $("saveBtn").addEventListener("click", doSave);
   $("applyBtn").addEventListener("click", doApply);
   $("startAllBtn").addEventListener("click", doStartAll);
+  $("stopAllBtn").addEventListener("click", doStopAll);
   $("refreshBtn").addEventListener("click", function () {
     if (state.dirty && !window.confirm("有未保存的修改，刷新会丢弃，继续？")) return;
     load();

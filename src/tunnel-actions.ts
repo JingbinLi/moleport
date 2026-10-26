@@ -171,3 +171,40 @@ export async function startAllTunnels(tomlPath: string): Promise<StartAllResult>
     tookMs: Date.now() - startedAt,
   };
 }
+
+export interface StopAllResult {
+  ok: boolean;
+  /** HTTP status the route reports for this outcome. */
+  code: number;
+  /** Tunnels whose ssh process was still alive when the call arrived. */
+  stopped: string[];
+  /** Stale state entries dropped without a signal (the pid was already gone). */
+  cleared: string[];
+  tookMs: number;
+}
+
+/**
+ * Stop every tracked tunnel - the page's counterpart of `moleport kill --all`.
+ *
+ * The config file is not touched: the rows stay, they just go back to 未运行,
+ * so "启动全部" can bring them back afterwards. Stale entries (a pid that is
+ * already gone) are dropped instead of being signalled, so a recycled pid
+ * cannot take down an unrelated process.
+ */
+export async function stopAllTunnels(): Promise<StopAllResult> {
+  const startedAt = Date.now();
+  return withState((): StopAllResult => {
+    const tunnels = loadState();
+    const alive = tunnels.filter((entry) => isProcessAlive(entry.pid));
+    const cleared = tunnels.filter((entry) => !isProcessAlive(entry.pid)).map((entry) => entry.name);
+    if (alive.length > 0) killTunnel(alive, undefined, true);
+    if (tunnels.length > 0) saveState([]);
+    return {
+      ok: true,
+      code: 200,
+      stopped: alive.map((entry) => entry.name),
+      cleared,
+      tookMs: Date.now() - startedAt,
+    };
+  });
+}

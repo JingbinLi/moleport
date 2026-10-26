@@ -293,6 +293,7 @@ Open that URL to:
 - add, edit and delete tunnels in a form — no TOML syntax to get wrong;
 - **启动 / 停止** per row — bring one tunnel up or down without touching the rest; deleting a running row stops it first;
 - **启动全部** — the button at the top of the list brings up every tunnel that is down, up to four at a time; tunnels that are already running are skipped and never restarted, so recovering one dropped tunnel does not disturb the healthy ones;
+- **停止全部** — the second button in the same head row stops every running tunnel in one go; it asks first, and the config file is not modified, so 启动全部 brings the rows back;
 - **已断开 + 日志** — a tunnel that was started and whose `ssh` process has since died is marked 已断开 instead of 未运行, and 日志 shows the tail of that ssh process's output (connection reset, host key change, key rejected, ...);
 - **保存** — write the list back to the TOML file; the previous content is always kept next to it as `tunnels.toml.bak`;
 - **保存并应用** — save, then close the current tunnels and recreate them from the new file, i.e. exactly what re-running `moleport --toml ...` does.

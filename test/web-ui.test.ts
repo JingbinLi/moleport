@@ -34,6 +34,15 @@ describe("web-ui", () => {
     expect(html).toContain('$("startAllBtn").addEventListener("click", doStartAll)');
   });
 
+  it("offers a stop-all control next to start-all", () => {
+    const html = renderWebUi();
+    expect(html).toContain('id="stopAllBtn"');
+    expect(html).toContain("停止全部");
+    expect(html).toContain('$("stopAllBtn").addEventListener("click", doStopAll)');
+    // stopping everything must ask first, like 保存并应用 does
+    expect(html).toContain("window.confirm(");
+  });
+
   it("keeps the delete action inside a fixed layout", () => {
     const html = renderWebUi();
     expect(html).toContain("table-layout: fixed");
